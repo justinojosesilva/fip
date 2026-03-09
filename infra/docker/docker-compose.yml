@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: fip_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - POSTGRES_DB=fip_postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  
+  redis:
+    image: redis:7
+    container_name: fip_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: fip_zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: fip_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+  
+  crypto_collector:
+    build: ../../collectors/crypto/market-collector
+    container_name: crypto_collector
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+
+volumes:
+  postgres_data:
