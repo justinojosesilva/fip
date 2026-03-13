@@ -92,6 +92,19 @@ services:
       - POSTGRES_USER=fip_postgres
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
+  
+  orderflow_engine:
+    build: ../../services/crypto/orderflow-engine
+    container_name: orderflow_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
 
 volumes:
   postgres_data:

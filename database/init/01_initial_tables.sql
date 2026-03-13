@@ -214,6 +214,21 @@ CREATE TABLE analytics.crypto_whales (
 SELECT create_hypertable('analytics.crypto_whales', 'time', if_not_exists => TRUE);
 
 -- =========================================
+CREATE TABLE analytics.crypto_orderflow (
+
+    time TIMESTAMPTZ NOT NULL,
+    symbol TEXT,
+
+    buy_volume NUMERIC,
+    sell_volume NUMERIC,
+
+    delta NUMERIC,
+    trade_count INT
+
+);
+
+SELECT create_hypertable('analytics.crypto_orderflow', 'time', if_not_exists => TRUE);
+-- =========================================
 -- SIGNALS
 -- =========================================
 
