@@ -79,6 +79,19 @@ services:
       - POSTGRES_USER=fip_postgres
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
+  
+  whale_tracker:
+    build: ../../services/crypto/whale-tracker
+    container_name: whale_tracker
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
 
 volumes:
   postgres_data:

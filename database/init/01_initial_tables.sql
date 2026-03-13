@@ -201,6 +201,18 @@ CREATE TABLE analytics.arbitrage_opportunities (
 
 SELECT create_hypertable('analytics.arbitrage_opportunities', 'time', if_not_exists => TRUE);
 
+-- ========================================
+CREATE TABLE analytics.crypto_whales (
+    time TIMESTAMPTZ NOT NULL,
+    symbol TEXT,
+    price NUMERIC,
+    quantity NUMERIC,
+    trade_value NUMERIC,
+    side TEXT
+);
+
+SELECT create_hypertable('analytics.crypto_whales', 'time', if_not_exists => TRUE);
+
 -- =========================================
 -- SIGNALS
 -- =========================================
