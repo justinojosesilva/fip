@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../../database/init:/docker-entrypoint-initdb.d
   
   redis:
     image: redis:7
@@ -40,10 +41,35 @@ services:
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fip_kafka_ui
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    depends_on:
+      - kafka
   
   crypto_collector:
     build: ../../collectors/crypto/market-collector
     container_name: crypto_collector
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  indicators_engine:
+    build: ../../services/crypto/indicators-engine
+    container_name: indicators_engine
     depends_on:
       - postgres
       - kafka

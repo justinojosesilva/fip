@@ -8,3 +8,5 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "fip_postgres")
 KAFKA_SERVER = os.getenv("KAFKA_SERVER", "kafka:9092")
 
 SYMBOL = "btcusdt"
+
+EXCHANGE = "binance"
