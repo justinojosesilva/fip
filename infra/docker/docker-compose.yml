@@ -158,6 +158,58 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
   
+  overbook_writer:
+    build: ../../writers/orderbook-writer
+    container_name: orderbook_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  indicators_writer:
+    build: ../../writers/indicators-writer
+    container_name: indicators_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  orderflow_writer:
+    build: ../../writers/orderflow-writer
+    container_name: orderflow_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  whales_tracker_writer:
+    build: ../../writers/whales-writer
+    container_name: whales_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
   indicators_engine:
     build: ../../services/crypto/indicators-engine
     container_name: indicators_engine
@@ -236,5 +288,18 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
 
+  squeeze_detector_engine:
+    build: ../../services/crypto/squeeze-detector-engine
+    container_name: squeeze_detector_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+      
 volumes:
   postgres_data:

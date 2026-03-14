@@ -4,8 +4,8 @@ from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime
 import config
 
-# kafka Consumer
-def connect_kafkaConsumer():
+# kafka
+def connect_kafka():
     while True:
         try:
             consumer = KafkaConsumer(
@@ -14,32 +14,18 @@ def connect_kafkaConsumer():
                 value_deserializer=lambda x: json.loads(x.decode("utf-8")),
                 auto_offset_reset="earliest",
                 enable_auto_commit=True,
-                ##group_id="candles-engine",
             )
-            print("Connected to Kafka")
-            return consumer
-        except Exception as e:
-            print("Kafka not ready, retrying in 5s...")
-            time.sleep(5)
-
-
-# kafka Producer
-def connect_kafkaProducer():
-    while True:
-        try:
             producer = KafkaProducer(
                 bootstrap_servers=config.KAFKA_SERVER,
                 value_serializer=lambda x: json.dumps(x).encode("utf-8"),
             )
-            print("Connected to Kafka Producer")
-            return producer
+            print("Connected to Kafka")
+            return consumer, producer
         except Exception as e:
-            print("Kafka Producer not ready, retrying in 5s...")
+            print("Kafka not ready, retrying in 5s...")
             time.sleep(5)
 
-
-consumer = connect_kafkaConsumer()
-producer = connect_kafkaProducer()
+consumer, producer = connect_kafka()
 
 windows = {}
 

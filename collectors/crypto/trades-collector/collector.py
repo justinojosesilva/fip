@@ -64,19 +64,27 @@ def on_error(ws, error):
   print(error)
 
 def on_close(ws, close_status_code, close_msg):
-  print("connection closed")
+  print("connection closed:", close_status_code, close_msg)
 
 def on_open(ws):
   print("connected to Binance websocket")
 
 if __name__ == "__main__":
   socket = f"wss://stream.binance.com:9443/ws/{config.SYMBOL}@trade"
-  ws = websocket.WebSocketApp(
-    socket,
-    on_message=on_message,
-    on_error=on_error,
-    on_close=on_close
-  )
-
-  ws.on_open = on_open
-  ws.run_forever()
+  while True:
+    try:
+      ws = websocket.WebSocketApp(
+        socket,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close
+      )
+    
+      ws.on_open = on_open
+      ws.run_forever()
+    except Exception as e:
+      print(f"Websocket error: {e}, reconnecting in 5s...")
+      
+    print("Reconnecting in 5 seconds...")
+    time.sleep(5)
+  

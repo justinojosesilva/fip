@@ -1,61 +1,31 @@
 import json
 import time
-import psycopg2
 import config
 
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
 
-# conexão banco
-def connect_db():
-  while True:
-    try:
-      conn = psycopg2.connect(
-        host=config.POSTGRES_HOST,
-        database=config.POSTGRES_DB,
-        user=config.POSTGRES_USER,
-        password=config.POSTGRES_PASSWORD
-      )
-      return conn
-    except psycopg2.OperationalError as e:
-      print(f"Error connecting to PostgreSQL: {e}")
-      time.sleep(5)
-      
-conn = connect_db()
-cursor = conn.cursor()
-
-# kafka Consumer
-def connect_kafkaConsumer():
+# kafka
+def connect_kafka():
   while True:
     try:
       consumer = KafkaConsumer(
         'crypto.trades',
         bootstrap_servers=config.KAFKA_SERVER,
-        value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+        auto_offset_reset="latest",
       )
-      print("Connected to Kafka")
-      return consumer
-    except Exception as e:
-      print(f"Error connecting to Kafka: {e}")
-      time.sleep(5)
-    
-consumer = connect_kafkaConsumer()
-
-# kafka producer
-def connect_kafkaProducer():
-  while True:
-    try:
       producer = KafkaProducer(
         bootstrap_servers=config.KAFKA_SERVER,
         value_serializer=lambda v: json.dumps(v).encode("utf-8")
       )
       print("Connected to Kafka")
-      return producer
+      return consumer, producer
     except Exception as e:
-      print("Kafka not ready, retrying in 5s...")
+      print(f"Error connecting to Kafka: {e}")
       time.sleep(5)
-
-producer = connect_kafkaProducer()
+    
+consumer, producer = connect_kafka()
 
 def save_whale(symbol, price, quantity, side, trade_value):
     now = datetime.now(timezone.utc)
@@ -87,11 +57,12 @@ def process_trade(trade):
         "quantity": quantity,
         "value": trade_value,
         "side": side,
+        "time": datetime.now(timezone.utc).isoformat()
       }
       
-      save_whale(symbol, price, quantity, side, trade_value)
+      producer.send("crypto.whales.detected", whale_event)
       
-      producer.send("crypto.whales", whale_event)
+      print("WHALE DETECTED: ", whale_event)
       
       
       

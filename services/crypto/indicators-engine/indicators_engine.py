@@ -1,10 +1,8 @@
 import json
 import time
-from datetime import datetime, timezone
-
 import config
-import psycopg2
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
+from datetime import datetime, timezone
 
 buffers = {}
 BUFFER_SIZE = 50
@@ -13,52 +11,37 @@ symbol_state = {}
 
 
 # kafka Consumer
-def connect_kafkaConsumer():
+def connect_kafka():
     while True:
         try:
             consumer = KafkaConsumer(
                 "crypto.trades",
                 bootstrap_servers=config.KAFKA_SERVER,
                 value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+                auto_offset_reset="earliest",
+                enable_auto_commit=True,
+            )
+            producer = KafkaProducer(
+                bootstrap_servers=config.KAFKA_SERVER,
+                value_serializer=lambda x: json.dumps(x).encode("utf-8"),
             )
             print("Connected to Kafka")
-            return consumer
+            return consumer, producer
         except Exception as e:
             print("Kafka not ready, retrying in 5s...")
             time.sleep(5)
 
 
-consumer = connect_kafkaConsumer()
-
-
-# conexão banco
-def connect_db():
-    while True:
-        try:
-            conn = psycopg2.connect(
-                host=config.POSTGRES_HOST,
-                database=config.POSTGRES_DB,
-                user=config.POSTGRES_USER,
-                password=config.POSTGRES_PASSWORD,
-            )
-            print("Connected to PostgreSQL")
-            return conn
-        except psycopg2.OperationalError:
-            print("Waiting for PostgreSQL...")
-            time.sleep(3)
-
-
-conn = connect_db()
-cursor = conn.cursor()
+consumer, producer = connect_kafka()
 
 
 def calculate_ema(prices, period=config.EMA_PERIOD):
     if len(prices) < period:
         return None
-    multipler = 2 / (period + 1)
+    multiplier = 2 / (period + 1)
     ema = prices[0]
     for price in prices[1:]:
-        ema = (price - ema) * multipler + ema
+        ema = (price - ema) * multiplier + ema
     return ema
 
 def calculate_rsi(prices, period=config.RSI_PERIOD):
@@ -101,7 +84,6 @@ def process_trade(trade):
     symbol = trade["symbol"]
     price = float(trade["price"])
     quantity = float(trade["quantity"])
-    time = datetime.fromisoformat(trade["time"])
 
     if symbol not in buffers:
         buffers[symbol] = []
@@ -122,37 +104,22 @@ def process_trade(trade):
     rsi = calculate_rsi(prices)
     ema = calculate_ema(prices)
     vwap = calculate_vwap(prices, quantities)
+
+    event = {
+      "symbol": symbol,
+      "price": price,
+      "ema": ema,
+      "rsi": rsi,
+      "vwap": vwap,
+      "volume": sum(quantities),
+      "time": datetime.now(timezone.utc).isoformat(),
+    }
     
-    save_indicators(symbol, price, ema, rsi, vwap, sum(quantities))
+    producer.send("crypto.indicators.metrics", event)
     
-    print(f"Saved indicators for {symbol} at {time}: price={price}, ema={ema}, rsi={rsi}, vwap={vwap}, volume={sum(quantities)}")
+    print("Indicators: ", event)
     
     buffers[symbol] = []
-
-
-def save_indicators(symbol, price, ema, rsi, vwap, volume):
-    
-    now = datetime.now(timezone.utc)
-  
-    try:
-        cursor.execute(
-            """
-      INSERT INTO analytics.crypto_indicators
-      (time, symbol, price, ema, rsi, vwap, volume)
-      VALUES (%s,%s,%s,%s,%s,%s,%s)
-      ON CONFLICT (time, symbol)
-      DO UPDATE SET
-          price = EXCLUDED.price,
-          rsi = EXCLUDED.rsi,
-          ema = EXCLUDED.ema,
-          vwap = EXCLUDED.vwap;
-      """,
-            (now, symbol, price, ema, rsi, vwap, volume),
-        )
-        conn.commit()
-    except Exception as e:
-        print(f"DB error: {e}")
-        conn.rollback()
 
 
 for message in consumer:

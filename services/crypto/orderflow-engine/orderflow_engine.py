@@ -1,6 +1,5 @@
 import json
 import time
-import psycopg2
 import config
 
 from kafka import KafkaConsumer, KafkaProducer
@@ -8,58 +7,29 @@ from datetime import datetime, timezone
 
 buffers = {}
 
-def connect_db():
-    while True:
-      try:
-        conn = psycopg2.connect(
-          host=config.POSTGRES_HOST,
-          database=config.POSTGRES_DB,
-          user=config.POSTGRES_USER,
-          password=config.POSTGRES_PASSWORD
-        )
-        
-        print("Connected to PostgreSQL")
-        return conn
-      except Exception as e:
-        print(f"Error connecting to PostgreSQL: {e}")
-        time.sleep(5)
-      
-conn = connect_db()
-cursor = conn.cursor()
-
-# kafka Consumer
-def connect_kafkaConsumer():
+# kafka
+def connect_kafka():
     while True:
       try:
           consumer = KafkaConsumer(
               "crypto.trades",
               bootstrap_servers=config.KAFKA_SERVER,
               value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+              auto_offset_reset="earliest",
+              enable_auto_commit=True,
+          )
+          producer = KafkaProducer(
+              bootstrap_servers=config.KAFKA_SERVER,
+              value_serializer=lambda x: json.dumps(x).encode("utf-8"),
           )
           print("Connected to Kafka")
-          return consumer
+          return consumer, producer
       except Exception as e:
           print("Kafka not ready, retrying in 5s...")
           time.sleep(5)
 
 
-consumer = connect_kafkaConsumer() 
-      
-# kafka Producer
-def connect_kafkaProducer():
-    while True:
-      try:
-          producer = KafkaProducer(
-              bootstrap_servers=config.KAFKA_SERVER,
-              value_serializer=lambda x: json.dumps(x).encode("utf-8"),
-          )
-          print("Connected to Kafka Producer")
-          return producer
-      except Exception as e:
-          print("Kafka Producer not ready, retrying in 5s...")
-          time.sleep(5)
-      
-producer = connect_kafkaProducer()
+consumer, producer = connect_kafka() 
 
 def process_trade(trade):
     symbol = trade["symbol"]
@@ -96,18 +66,6 @@ def calculate_orderflow(symbol):
             
     delta = buy_volume - sell_volume
     trade_count = len(trades)
-    save_orderflow(symbol, buy_volume, sell_volume, delta, trade_count)
-    buffers[symbol] = []
-    
-def save_orderflow(symbol, buy_volume, sell_volume, delta, trade_count):
-    now = datetime.now(timezone.utc)
-    
-    cursor.execute("""
-      INSERT INTO analytics.crypto_orderflow(time, symbol, buy_volume, sell_volume, delta, trade_count) 
-      VALUES (%s, %s, %s, %s, %s, %s)
-        """, (now, symbol, buy_volume, sell_volume, delta, trade_count)
-    )
-    conn.commit()
     
     event = {
       "symbol": symbol,
@@ -115,10 +73,12 @@ def save_orderflow(symbol, buy_volume, sell_volume, delta, trade_count):
       "sell_volume": sell_volume,
       "delta": delta,
       "trade_count": trade_count,
+      "time": datetime.now(timezone.utc).isoformat(),
     }
     
-    producer.send("crypto.orderflow", event)
-    print(event)
+    producer.send("crypto.orderflow.metrics", event)
+    print("Orderflow: ", event)
+    buffers[symbol] = []
     
 for message in consumer:
     trade = message.value

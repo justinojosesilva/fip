@@ -204,11 +204,13 @@ SELECT create_hypertable('analytics.arbitrage_opportunities', 'time', if_not_exi
 -- ========================================
 CREATE TABLE analytics.crypto_whales (
     time TIMESTAMPTZ NOT NULL,
-    symbol TEXT,
-    price NUMERIC,
-    quantity NUMERIC,
-    trade_value NUMERIC,
-    side TEXT
+    symbol TEXT NOT NULL,
+    price DOUBLE PRECISION,
+    quantity DOUBLE PRECISION,
+    trade_value DOUBLE PRECISION,
+    side TEXT,
+    
+    PRIMARY KEY (time, symbol, trade_value)
 );
 
 SELECT create_hypertable('analytics.crypto_whales', 'time', if_not_exists => TRUE);
@@ -217,13 +219,15 @@ SELECT create_hypertable('analytics.crypto_whales', 'time', if_not_exists => TRU
 CREATE TABLE analytics.crypto_orderflow (
 
     time TIMESTAMPTZ NOT NULL,
-    symbol TEXT,
+    symbol TEXT NOT NULL,
 
-    buy_volume NUMERIC,
-    sell_volume NUMERIC,
+    buy_volume DOUBLE PRECISION,
+    sell_volume DOUBLE PRECISION,
 
-    delta NUMERIC,
-    trade_count INT
+    delta DOUBLE PRECISION,
+    trade_count INTEGER,
+    
+    PRIMARY KEY (time, symbol)
 
 );
 
@@ -233,13 +237,13 @@ SELECT create_hypertable('analytics.crypto_orderflow', 'time', if_not_exists => 
 CREATE TABLE analytics.crypto_orderbook (
 
     time TIMESTAMPTZ NOT NULL,
-    symbol TEXT,
+    symbol TEXT NOT NULL,
 
-    bid_volume NUMERIC,
-    ask_volume NUMERIC,
+    bid_volume DOUBLE PRECISION,
+    ask_volume DOUBLE PRECISION,
 
-    spread NUMERIC,
-    imbalance NUMERIC,
+    spread DOUBLE PRECISION,
+    imbalance DOUBLE PRECISION,
 
     PRIMARY KEY (time, symbol)
 );
