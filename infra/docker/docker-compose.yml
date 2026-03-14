@@ -67,6 +67,19 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
   
+  liquidation_collector:
+    build: ../../collectors/crypto/liquidation-collector
+    container_name: liquidation_collector
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
   trades_writer:
     build: ../../writers/trades-writer
     container_name: trades_writer

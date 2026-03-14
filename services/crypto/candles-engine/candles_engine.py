@@ -17,7 +17,7 @@ def connect_kafkaConsumer():
                 value_deserializer=lambda x: json.loads(x.decode("utf-8")),
                 auto_offset_reset="earliest",
                 enable_auto_commit=True,
-                group_id="candles-engine",
+                ##group_id="candles-engine",
             )
             print("Connected to Kafka")
             return consumer
