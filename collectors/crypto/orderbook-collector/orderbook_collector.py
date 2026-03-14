@@ -39,6 +39,8 @@ def on_message(ws, message):
 
   producer.send("crypto.orderbook.raw", orderbook_data)
   
+  print(orderbook_data)
+  
 def on_error(ws, error):
   print("WebSocket error: ", error)
   

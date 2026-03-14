@@ -125,6 +125,8 @@ def process_trade(trade):
     
     save_indicators(symbol, price, ema, rsi, vwap, sum(quantities))
     
+    print(f"Saved indicators for {symbol} at {time}: price={price}, ema={ema}, rsi={rsi}, vwap={vwap}, volume={sum(quantities)}")
+    
     buffers[symbol] = []
 
 

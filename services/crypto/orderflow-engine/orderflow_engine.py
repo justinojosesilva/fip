@@ -109,13 +109,16 @@ def save_orderflow(symbol, buy_volume, sell_volume, delta, trade_count):
     )
     conn.commit()
     
-    producer.send("crypto.orderflow", {
+    event = {
       "symbol": symbol,
       "buy_volume": buy_volume,
       "sell_volume": sell_volume,
       "delta": delta,
       "trade_count": trade_count,
-    })
+    }
+    
+    producer.send("crypto.orderflow", event)
+    print(event)
     
 for message in consumer:
     trade = message.value

@@ -228,6 +228,24 @@ CREATE TABLE analytics.crypto_orderflow (
 );
 
 SELECT create_hypertable('analytics.crypto_orderflow', 'time', if_not_exists => TRUE);
+
+-- =========================================
+CREATE TABLE analytics.crypto_orderbook (
+
+    time TIMESTAMPTZ NOT NULL,
+    symbol TEXT,
+
+    bid_volume NUMERIC,
+    ask_volume NUMERIC,
+
+    spread NUMERIC,
+    imbalance NUMERIC,
+
+    PRIMARY KEY (time, symbol)
+);
+
+SELECT create_hypertable('analytics.crypto_orderbook', 'time', if_not_exists => TRUE);
+
 -- =========================================
 -- SIGNALS
 -- =========================================
