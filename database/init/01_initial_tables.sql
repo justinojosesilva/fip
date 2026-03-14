@@ -66,13 +66,14 @@ SELECT add_retention_policy('market_data.crypto_trades_raw', INTERVAL '1 year');
 CREATE TABLE market_data.crypto_candles (
     time TIMESTAMPTZ NOT NULL,
     symbol TEXT NOT NULL,
-    timeframe TEXT NOT NULL,
-    open NUMERIC,
-    high NUMERIC,
-    low NUMERIC,
-    close NUMERIC,
-    volume NUMERIC,
-    PRIMARY KEY (time, symbol, timeframe)
+    interval TEXT NOT NULL,
+    open DOUBLE PRECISION,
+    high DOUBLE PRECISION,
+    low DOUBLE PRECISION,
+    close DOUBLE PRECISION,
+    volume DOUBLE PRECISION,
+    exchange TEXT,
+    PRIMARY KEY (time, symbol, interval)
 );
 
 SELECT create_hypertable('market_data.crypto_candles', 'time', if_not_exists => TRUE);
@@ -80,9 +81,9 @@ SELECT create_hypertable('market_data.crypto_candles', 'time', if_not_exists => 
 ALTER TABLE market_data.crypto_candles
 SET (timescaledb.compress);
 
-SELECT add_compression_policy('market_data.crypto_candles', INTERVAL '30 days');
+SELECT add_compression_policy('market_data.crypto_candles', INTERVAL '7 days');
 
-SELECT add_retention_policy('market_data.crypto_candles', INTERVAL '5 years');
+SELECT add_retention_policy('market_data.crypto_candles', INTERVAL '2 years');
 
 -- =========================================
 

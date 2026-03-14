@@ -93,6 +93,19 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
 
+  candles_writer:
+    build: ../../writers/candles-writer
+    container_name: candles_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+
   indicators_engine:
     build: ../../services/crypto/indicators-engine
     container_name: indicators_engine
@@ -158,5 +171,18 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
       
+  candles_engine:
+    build: ../../services/crypto/candles-engine
+    container_name: candles_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+
 volumes:
   postgres_data:
