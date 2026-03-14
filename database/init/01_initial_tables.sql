@@ -247,6 +247,42 @@ CREATE TABLE analytics.crypto_orderbook (
 SELECT create_hypertable('analytics.crypto_orderbook', 'time', if_not_exists => TRUE);
 
 -- =========================================
+CREATE TABLE analytics.crypto_liquidation_metrics (
+    time TIMESTAMPTZ NOT NULL,
+    symbol TEXT NOT NULL,
+    interval TEXT NOT NULL,
+    long_liquidations DOUBLE PRECISION,
+    short_liquidations DOUBLE PRECISION,
+    liquidation_imbalance DOUBLE PRECISION,
+    PRIMARY KEY (time, symbol, interval)
+);
+
+SELECT create_hypertable('analytics.crypto_liquidation_metrics', 'time', if_not_exists => TRUE);
+
+ALTER TABLE analytics.crypto_liquidation_metrics
+SET (timescaledb.compress);
+
+SELECT add_compression_policy(
+ 'analytics.crypto_liquidation_metrics',
+ INTERVAL '7 days'
+);
+
+-- =========================================
+CREATE TABLE analytics.crypto_liquidation_cascades (
+    time TIMESTAMPTZ NOT NULL,
+    symbol TEXT NOT NULL,
+    type TEXT,
+    volume DOUBLE PRECISION,
+    PRIMARY KEY (time, symbol, type)
+);
+
+SELECT create_hypertable(
+ 'analytics.crypto_liquidation_cascades',
+ 'time',
+ if_not_exists => TRUE
+);
+
+-- =========================================
 -- SIGNALS
 -- =========================================
 

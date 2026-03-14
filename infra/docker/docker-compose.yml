@@ -54,9 +54,9 @@ services:
     depends_on:
       - kafka
   
-  crypto_collector:
+  trades_collector:
     build: ../../collectors/crypto/trades-collector
-    container_name: crypto_collector
+    container_name: trades_collector
     depends_on:
       - postgres
       - kafka
@@ -70,6 +70,19 @@ services:
   liquidation_collector:
     build: ../../collectors/crypto/liquidation-collector
     container_name: liquidation_collector
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  orderbook_collector:
+    build: ../../collectors/crypto/orderbook-collector
+    container_name: orderbook_collector
     depends_on:
       - postgres
       - kafka
@@ -119,6 +132,32 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
 
+  liquidation_metrics_writer:
+    build: ../../writers/liquidation-metrics-writer
+    container_name: liquidation_metrics_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  liquidation_cascades_writer:
+    build: ../../writers/liquidation-cascades-writer
+    container_name: liquidation_cascades_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
   indicators_engine:
     build: ../../services/crypto/indicators-engine
     container_name: indicators_engine
@@ -158,19 +197,6 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
   
-  orderbook_collector:
-    build: ../../collectors/crypto/orderbook-collector
-    container_name: orderbook_collector
-    depends_on:
-      - postgres
-      - kafka
-    environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
   orderbook_engine:
     build: ../../services/crypto/orderbook-engine
     container_name: orderbook_engine
@@ -187,6 +213,19 @@ services:
   candles_engine:
     build: ../../services/crypto/candles-engine
     container_name: candles_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  liquidation_engine:
+    build: ../../services/crypto/liquidation-engine
+    container_name: liquidation_engine
     depends_on:
       - postgres
       - kafka

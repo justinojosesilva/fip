@@ -9,7 +9,7 @@ def connect_kafkaConsumer():
     while True:
         try:
             consumer = KafkaConsumer(
-                "crypto.trades",
+                "crypto.liquidations",
                 bootstrap_servers=config.KAFKA_SERVER,
                 value_deserializer=lambda x: json.loads(x.decode("utf-8")),
                 auto_offset_reset="earliest",
@@ -113,6 +113,7 @@ def flush_window():
           producer.send("crypto.liquidation.metrics", event)
           detect_cascade(event)
           keys_to_delete.append(key)
+          
     for key in keys_to_delete:
         del windows[key]
         
