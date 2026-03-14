@@ -25,8 +25,7 @@ CREATE SCHEMA IF NOT EXISTS system;
 CREATE TABLE market_data.crypto_prices (
     time TIMESTAMPTZ NOT NULL,
     symbol TEXT NOT NULL,
-    price NUMERIC,
-    volume NUMERIC,
+    price DOUBLE PRECISION,
     exchange TEXT,
     PRIMARY KEY (time, symbol)
 );

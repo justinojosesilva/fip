@@ -55,7 +55,7 @@ services:
       - kafka
   
   crypto_collector:
-    build: ../../collectors/crypto/market-collector
+    build: ../../collectors/crypto/trades-collector
     container_name: crypto_collector
     depends_on:
       - postgres
@@ -67,6 +67,32 @@ services:
       - POSTGRES_PASSWORD=fip_postgres
       - KAFKA_SERVER=kafka:9092
   
+  trades_writer:
+    build: ../../writers/trades-writer
+    container_name: trades_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+  
+  prices_writer:
+    build: ../../writers/prices-writer
+    container_name: prices_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=fip_postgres
+      - POSTGRES_USER=fip_postgres
+      - POSTGRES_PASSWORD=fip_postgres
+      - KAFKA_SERVER=kafka:9092
+
   indicators_engine:
     build: ../../services/crypto/indicators-engine
     container_name: indicators_engine
