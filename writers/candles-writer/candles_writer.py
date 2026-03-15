@@ -72,7 +72,8 @@ def save_candle(candle):
       conn.rollback()
       
 for message in consumer:
-    candle = message.value
-    print("Candle received: ", candle)
+    event = message.value
+    candle = event["data"]
+    print("Candle received: ", event)
     save_candle(candle)
     

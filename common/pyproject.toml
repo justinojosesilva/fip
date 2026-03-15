@@ -1,0 +1,12 @@
+[project]
+name = "fip-common"
+version = "0.1.0"
+description = "Common utilities for FIP trading platform"
+authors = [
+    { name = "Justino Silva", email = "justinojosesilva@gmail.com" }
+]
+dependencies = []
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

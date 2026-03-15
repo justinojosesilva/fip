@@ -1,9 +1,9 @@
 import json
 import time
-from datetime import datetime
-
 import config
+from datetime import datetime
 from kafka import KafkaConsumer, KafkaProducer
+from common.event import create_event
 
 
 # kafka
@@ -46,7 +46,8 @@ def start_new_candle(price, qty, symbol):
 
 
 for message in consumer:
-    trade = message.value
+    event = message.value
+    trade = event["data"]
 
     symbol = trade["symbol"]
     price = float(trade["price"])
@@ -62,22 +63,25 @@ for message in consumer:
         current_candle = start_new_candle(price, qty, symbol)
 
     elif window != current_window:
-        candle_event = {
-            "symbol": current_candle["symbol"],
-            "interval": "1m",
-            "open": current_candle["open"],
-            "high": current_candle["high"],
-            "low": current_candle["low"],
-            "close": current_candle["close"],
-            "volume": current_candle["volume"],
-            "time": datetime.utcfromtimestamp(
-                current_window * config.CANDLE_INTERVAL
-            ).isoformat(),
-        }
-
-        producer.send("crypto.candles", candle_event)
+        candle_event = create_event(
+          event_type="candles",
+          source="candles-engine",
+          data={
+              "symbol": current_candle["symbol"],
+              "interval": "1m",
+              "open": current_candle["open"],
+              "high": current_candle["high"],
+              "low": current_candle["low"],
+              "close": current_candle["close"],
+              "volume": current_candle["volume"],
+              "time": datetime.utcfromtimestamp(
+                  current_window * config.CANDLE_INTERVAL
+              ).isoformat(),
+          }
+        )
         print("Candle: ", candle_event)
-
+        producer.send("crypto.candles", candle_event)
+        
         current_window = window
         current_candle = start_new_candle(price, qty, symbol)
 

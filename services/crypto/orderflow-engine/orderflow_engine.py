@@ -4,6 +4,7 @@ import config
 
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
+from common.event import create_event
 
 buffers = {}
 
@@ -67,19 +68,23 @@ def calculate_orderflow(symbol):
     delta = buy_volume - sell_volume
     trade_count = len(trades)
     
-    event = {
-      "symbol": symbol,
-      "buy_volume": buy_volume,
-      "sell_volume": sell_volume,
-      "delta": delta,
-      "trade_count": trade_count,
-      "time": datetime.now(timezone.utc).isoformat(),
-    }
-    
-    producer.send("crypto.orderflow.metrics", event)
+    event = create_event(
+      event_type="orderflow",
+      source="orderflow-engine",
+      data={
+        "symbol": symbol,
+        "buy_volume": buy_volume,
+        "sell_volume": sell_volume,
+        "delta": delta,
+        "trade_count": trade_count,
+        "time": datetime.now(timezone.utc).isoformat(),
+      }
+    )
     print("Orderflow: ", event)
+    producer.send("crypto.orderflow.metrics", event)    
     buffers[symbol] = []
     
 for message in consumer:
-    trade = message.value
+    event = message.value
+    trade = event["data"]
     process_trade(trade)

@@ -92,7 +92,6 @@ def save_indicator(event):
 for message in consumer:
 
     event = message.value
-
-    save_indicator(event)
-
+    data = event["data"]
     print("Saved indicators:", event)
+    save_indicator(data)

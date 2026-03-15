@@ -4,6 +4,7 @@ import config
 
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
+from common.event import create_event
 
 # kafka
 def connect_kafka():
@@ -27,18 +28,6 @@ def connect_kafka():
     
 consumer, producer = connect_kafka()
 
-def save_whale(symbol, price, quantity, side, trade_value):
-    now = datetime.now(timezone.utc)
-    try:
-      cursor.execute("""
-        INSERT INTO analytics.crypto_whales 
-        (time, symbol, price, quantity, trade_value, side)
-        VALUES (%s, %s, %s, %s, %s, %s)
-      """, (now, symbol, price, quantity, trade_value, side))
-      conn.commit()
-    except Exception as e:
-      print(f"Error saving whale to database: {e}")
-      conn.rollback()
       
 def process_trade(trade):
     symbol = trade['symbol']
@@ -51,22 +40,24 @@ def process_trade(trade):
     if trade_value >= config.WHALE_THRESHOLD:
       print(f"WHALE DETECTED: {trade}")
       
-      whale_event = {
-        "symbol": symbol,
-        "price": price,
-        "quantity": quantity,
-        "value": trade_value,
-        "side": side,
-        "time": datetime.now(timezone.utc).isoformat()
-      }
-      
-      producer.send("crypto.whales.detected", whale_event)
-      
+      whale_event = create_event(
+        event_type="whale_detected",
+        source="whale_tracker",
+        data={
+          "symbol": symbol,
+          "price": price,
+          "quantity": quantity,
+          "value": trade_value,
+          "side": side,
+          "time": datetime.now(timezone.utc).isoformat()
+        }
+      )
       print("WHALE DETECTED: ", whale_event)
-      
+      producer.send("crypto.whales.detected", whale_event)
       
       
 # loop principal
 for message in consumer:
-    trade = message.value
+    event = message.value
+    trade = event["data"]
     process_trade(trade)

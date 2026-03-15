@@ -69,6 +69,7 @@ def save_metric(metric):
       conn.rollback()
       
 for message in consumer:
-    metric = message.value
-    save_metric(metric)
-    print("Saved liquidation metric:", metric)
+    event = message.value
+    metric = event["data"]
+    print("Saved liquidation metric:", event)
+    save_metric(metric)    

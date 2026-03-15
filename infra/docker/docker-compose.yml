@@ -1,8 +1,32 @@
+x-service-defaults: &service_defaults
+  restart: unless-stopped
+  networks:
+    - fip_network
+
+x-engine-defaults: &engine_defaults
+  <<: *service_defaults
+  mem_limit: 512m
+
+x-writer-defaults: &writer_defaults
+  <<: *service_defaults
+  mem_limit: 256m
+
+x-collector-defaults: &collector_defaults
+  <<: *service_defaults
+  mem_limit: 128m
+
+x-env-defaults: &env_defaults
+  POSTGRES_HOST: postgres
+  POSTGRES_DB: fip_postgres
+  POSTGRES_USER: fip_postgres
+  POSTGRES_PASSWORD: fip_postgres
+  KAFKA_SERVER: kafka:9092
+
 services:
   postgres:
     image: timescale/timescaledb:latest-pg15
     container_name: fip_postgres
-    restart: always
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=fip_postgres
       - POSTGRES_PASSWORD=fip_postgres
@@ -12,13 +36,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../../database/init:/docker-entrypoint-initdb.d
+    networks:
+      - fip_network
   
   redis:
     image: redis:7
     container_name: fip_redis
-    restart: always
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    networks:
+      - fip_network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -27,6 +55,8 @@ services:
       - ZOOKEEPER_CLIENT_PORT=2181
     ports:
       - "2181:2181"
+    networks:
+      - fip_network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -41,7 +71,14 @@ services:
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fip_network
+      
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: fip_kafka_ui
@@ -53,253 +90,239 @@ services:
       - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
     depends_on:
       - kafka
+    networks:
+      - fip_network
   
   trades_collector:
-    build: ../../collectors/crypto/trades-collector
+    <<: *collector_defaults
+    build: 
+      context: ../..
+      dockerfile: collectors/crypto/trades-collector/Dockerfile
     container_name: trades_collector
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+      
   liquidation_collector:
-    build: ../../collectors/crypto/liquidation-collector
+    <<: *collector_defaults
+    build: 
+      context: ../..
+      dockerfile: collectors/crypto/liquidation-collector/Dockerfile
     container_name: liquidation_collector
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
+      <<: *env_defaults
   
   orderbook_collector:
-    build: ../../collectors/crypto/orderbook-collector
+    <<: *collector_defaults
+    build: 
+      context: ../..
+      dockerfile: collectors/crypto/orderbook-collector/Dockerfile
     container_name: orderbook_collector
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
+      <<: *env_defaults
   
   trades_writer:
-    build: ../../writers/trades-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/trades-writer/Dockerfile
     container_name: trades_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+    
   prices_writer:
-    build: ../../writers/prices-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/prices-writer/Dockerfile
     container_name: prices_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-
+      <<: *env_defaults
+    
   candles_writer:
-    build: ../../writers/candles-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/candles-writer/Dockerfile
     container_name: candles_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-
+      <<: *env_defaults
+    
   liquidation_metrics_writer:
-    build: ../../writers/liquidation-metrics-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/liquidation-metrics-writer/Dockerfile
     container_name: liquidation_metrics_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+
   liquidation_cascades_writer:
-    build: ../../writers/liquidation-cascades-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/liquidation-cascades-writer/Dockerfile
     container_name: liquidation_cascades_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
-  overbook_writer:
-    build: ../../writers/orderbook-writer
+      <<: *env_defaults
+      
+  orderbook_writer:
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/orderbook-writer/Dockerfile
     container_name: orderbook_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+      
   indicators_writer:
-    build: ../../writers/indicators-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/indicators-writer/Dockerfile
     container_name: indicators_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+      
   orderflow_writer:
-    build: ../../writers/orderflow-writer
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/orderflow-writer/Dockerfile
     container_name: orderflow_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
-  whales_tracker_writer:
-    build: ../../writers/whales-writer
+      <<: *env_defaults
+      
+  whales_writer:
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/whales-writer/Dockerfile
     container_name: whales_writer
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+    
   indicators_engine:
-    build: ../../services/crypto/indicators-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/indicators-engine/Dockerfile
     container_name: indicators_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+      
   whale_tracker:
-    build: ../../services/crypto/whale-tracker
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/whale-tracker/Dockerfile
     container_name: whale_tracker
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+
   orderflow_engine:
-    build: ../../services/crypto/orderflow-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/orderflow-engine/Dockerfile
     container_name: orderflow_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+    
   orderbook_engine:
-    build: ../../services/crypto/orderbook-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/orderbook-engine/Dockerfile
     container_name: orderbook_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-      
+      <<: *env_defaults
+    
   candles_engine:
-    build: ../../services/crypto/candles-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/candles-engine/Dockerfile
     container_name: candles_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-  
+      <<: *env_defaults
+    
   liquidation_engine:
-    build: ../../services/crypto/liquidation-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/liquidation-engine/Dockerfile
     container_name: liquidation_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
-
+      <<: *env_defaults
+      
   squeeze_detector_engine:
-    build: ../../services/crypto/squeeze-detector-engine
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/squeeze-detector-engine/Dockerfile
     container_name: squeeze_detector_engine
     depends_on:
       - postgres
       - kafka
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=fip_postgres
-      - POSTGRES_USER=fip_postgres
-      - POSTGRES_PASSWORD=fip_postgres
-      - KAFKA_SERVER=kafka:9092
+      <<: *env_defaults
       
 volumes:
   postgres_data:
+     
+networks:
+  fip_network:

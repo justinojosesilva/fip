@@ -1,8 +1,10 @@
 import json
 import time
+import config
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime
-import config
+from common.event import create_event
+
 
 # kafka
 def connect_kafka():
@@ -86,14 +88,18 @@ def flush_window():
         window = int(window)
         if window < now_window:
           data = windows[key]
-          event = {
-            "symbol": symbol,
-            "interval": "1m",
-            "long_liquidations": data["long_liquidations"],
-            "short_liquidations": data["short_liquidations"],
-            "liquidation_imbalance": data["long_liquidations"] - data["short_liquidations"],
-            "time": datetime.utcfromtimestamp(window * config.WINDOW_SECONDS).isoformat()
-          }
+          event = create_event(
+            event_type="liquidation",
+            source="liquidation-engine",
+            data = {
+              "symbol": symbol,
+              "interval": "1m",
+              "long_liquidations": data["long_liquidations"],
+              "short_liquidations": data["short_liquidations"],
+              "liquidation_imbalance": data["long_liquidations"] - data["short_liquidations"],
+              "time": datetime.utcfromtimestamp(window * config.WINDOW_SECONDS).isoformat()
+            } 
+          )
           
           print("Liquidation metric: ", event)
           producer.send("crypto.liquidation.metrics", event)
@@ -105,5 +111,6 @@ def flush_window():
         
 for message in consumer:
     event = message.value
-    process_liquidation(event)
+    data = event["data"]
+    process_liquidation(data)
     flush_window()

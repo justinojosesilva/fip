@@ -3,6 +3,7 @@ import websocket
 import config
 import time
 from kafka import KafkaProducer
+from common.event import create_event
 
 # kafka producer
 def connect_kafkaProducer():
@@ -29,13 +30,17 @@ def on_message(ws, message):
   asks = data["a"]
   timestamp = data["E"]
 
-  orderbook_data = {
-    "symbol": symbol,
-    "bids": bids,
-    "asks": asks,
-    "timestamp": timestamp,
-    "exchange": config.EXCHANGE
-  }
+  orderbook_data = create_event(
+    event_type="orderbook",
+    source="orderbook-collector",
+    data={
+      "symbol": symbol,
+      "bids": bids,
+      "asks": asks,
+      "timestamp": timestamp,
+      "exchange": config.EXCHANGE
+    }
+  )
 
   producer.send("crypto.orderbook.raw", orderbook_data)
   

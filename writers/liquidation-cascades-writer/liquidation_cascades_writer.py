@@ -68,5 +68,7 @@ def save_cascade(event):
         
 for message in consumer:
     event = message.value
-    save_cascade(event)
+    data = event["data"]
     print("Saved liquidation cascade:", event)
+    save_cascade(data)
+    

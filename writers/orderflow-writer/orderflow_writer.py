@@ -80,5 +80,6 @@ def save_orderflow(event):
 
 for message in consumer:
     event = message.value
-    save_orderflow(event)
+    data = event["data"]
     print("Saved orderflow:", event)
+    save_orderflow(data)

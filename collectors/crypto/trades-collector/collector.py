@@ -1,9 +1,11 @@
 import json
 import websocket
 import time
+import config
 from kafka import KafkaProducer
 from datetime import datetime, timezone
-import config
+from common.event import create_event
+
 
 # kafka producer
 def connect_kafkaProducer():
@@ -38,22 +40,30 @@ def on_message(ws, message):
   
   side = "sell" if is_maker else "buy"
 
-  event = {
-    "symbol": symbol,
-    "price": price,
-    "quantity": quantity,
-    "side": side,
-    "trade_id": trade_id,
-    "time": trade_time.isoformat(),
-    "exchange": config.EXCHANGE
-  }
+  event = create_event(
+    event_type="crypto.trades",
+    source="trades-collector",
+    data={
+      "symbol": symbol,
+      "price": price,
+      "quantity": quantity,
+      "side": side,
+      "trade_id": trade_id,
+      "time": trade_time.isoformat(),
+      "exchange": config.EXCHANGE
+    }
+  )
   
-  event_price = {
-    "symbol": symbol,
-    "price": price,
-    "time": trade_time.isoformat(),
-    "exchange": config.EXCHANGE
-  }
+  event_price = create_event(
+    event_type="prices",
+    source="trades-collector",
+    data={
+      "symbol": symbol,
+      "price": price,
+      "time": trade_time.isoformat(),
+      "exchange": config.EXCHANGE
+    }
+  )
 
   # envia para kafka
   producer.send("crypto.trades", event)

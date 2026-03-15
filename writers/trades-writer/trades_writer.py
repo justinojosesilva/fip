@@ -72,7 +72,8 @@ def flush_buffer():
         conn.rollback()
     
 for message in consumer:
-    trade = message.value
+    event = message.value
+    trade = event["data"]
     
     if not isinstance(trade, dict):
         print("Invalid message format: ", trade)

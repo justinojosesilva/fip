@@ -3,6 +3,7 @@ import time
 import config
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
+from common.event import create_event
 
 buffers = {}
 BUFFER_SIZE = 50
@@ -105,23 +106,25 @@ def process_trade(trade):
     ema = calculate_ema(prices)
     vwap = calculate_vwap(prices, quantities)
 
-    event = {
-      "symbol": symbol,
-      "price": price,
-      "ema": ema,
-      "rsi": rsi,
-      "vwap": vwap,
-      "volume": sum(quantities),
-      "time": datetime.now(timezone.utc).isoformat(),
-    }
-    
-    producer.send("crypto.indicators.metrics", event)
-    
+    event = create_event(
+        event_type="indicators",
+        source="indicators-engine",
+        data={
+          "symbol": symbol,
+          "price": price,
+          "ema": ema,
+          "rsi": rsi,
+          "vwap": vwap,
+          "volume": sum(quantities),
+          "time": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     print("Indicators: ", event)
-    
+    producer.send("crypto.indicators.metrics", event)
     buffers[symbol] = []
 
 
 for message in consumer:
-    trade = message.value
+    event = message.value
+    trade = event["data"]
     process_trade(trade)

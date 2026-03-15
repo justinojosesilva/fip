@@ -2,9 +2,10 @@ import json
 from socket import socket
 import websocket
 import time
+import config
 from kafka import KafkaProducer
 from datetime import datetime, timezone
-import config
+from common.event import create_event
 
 # kafka producer
 def connect_kafkaProducer():
@@ -38,14 +39,18 @@ def on_message(ws, message):
     timestamp = data["E"]
     event_time = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc)
     
-    liquidation_event = {
-      "symbol": symbol,
-      "side": side,
-      "price": price,
-      "quantity": quantity,
-      "time": event_time.isoformat(),
-      "exchange": config.EXCHANGE
-    }
+    liquidation_event = create_event(
+      event_type="liquidations",
+      source="liquidation-collector",
+      data={
+        "symbol": symbol,
+        "side": side,
+        "price": price,
+        "quantity": quantity,
+        "time": event_time.isoformat(),
+        "exchange": config.EXCHANGE
+      }
+    )
   
     print("Liquidation: ", liquidation_event) 
     producer.send("crypto.liquidations", liquidation_event)     

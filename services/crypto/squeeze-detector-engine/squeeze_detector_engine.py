@@ -1,7 +1,8 @@
 import json
 import time
-from kafka import KafkaConsumer, KafkaProducer
 import config
+from kafka import KafkaConsumer, KafkaProducer
+from common.event import create_event
 
 orderflow_data = {}
 orderbook_data = {}
@@ -58,19 +59,24 @@ def detect_squeeze(symbol):
       and buy_pressure > config.ORDERFLOW_THRESHOLD
       and imbalance > config.ORDERBOOK_IMBALANCE_THRESHOLD
     ):
-      signal = {
-        "symbol": symbol,
-        "type": "LONG_SQUEEZE",
-        "confidence": sell_pressure,
-        "time": liquidation["time"]
-      }
+      signal = create_event(
+        event_type="squeeze_signal",
+        source="squeeze_detector_engine",
+        data={
+          "symbol": symbol,
+          "type": "LONG_SQUEEZE",
+          "confidence": sell_pressure,
+          "time": liquidation["time"]
+        }
+      )
       
       print(f"Detected LONG SQUEEZE for {symbol} with confidence {sell_pressure:.2f}")
       producer.send("crypto.squeeze.signals", signal)
 
 for message in consumer:
     topic = message.topic
-    data = message.value
+    event = message.value
+    data = event["data"]
     symbol = data["symbol"]
     
     if topic == "crypto.orderflow":

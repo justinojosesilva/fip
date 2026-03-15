@@ -1,6 +1,7 @@
 FROM python:3.11
 WORKDIR /app
-COPY requirements.txt .
+COPY common /common
+RUN pip install /common
+COPY writers/orderbook-writer /app
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
 CMD [ "python", "orderbook_writer.py" ]

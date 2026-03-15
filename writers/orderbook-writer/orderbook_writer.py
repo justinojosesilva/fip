@@ -69,5 +69,6 @@ def save_orderbook(event):
 
 for message in consumer:
     event = message.value
-    save_orderbook(event)
+    data = event["data"]
     print("Saved orderbook metric: ", event)
+    save_orderbook(data)

@@ -1,9 +1,9 @@
 import json
 import time
-from datetime import datetime, timezone
-
 import config
+from datetime import datetime, timezone
 from kafka import KafkaConsumer, KafkaProducer
+from common.event import create_event
 
 # kafka Consumer
 def connect_kafkaConsumer():
@@ -62,7 +62,8 @@ def process_orderbook(data):
 
       
 for message in consumer:
-    data = message.value 
+    event = message.value 
+    data = event["data"]
     symbol = data["symbol"]
     
     result = process_orderbook(data)
@@ -72,15 +73,19 @@ for message in consumer:
 
     bid_volume, ask_volume, spread, imbalance = result
 
-    event = {
-        "symbol": symbol,
-        "bid_volume": bid_volume,
-        "ask_volume": ask_volume,
-        "spread": spread,
-        "imbalance": imbalance,
-        "time": datetime.now(timezone.utc).isoformat()
-    }
-
+    event = create_event(
+        event_type="orderbook",
+        source="orderbook-engine",
+        data={
+            "symbol": symbol,
+            "bid_volume": bid_volume,
+            "ask_volume": ask_volume,
+            "spread": spread,
+            "imbalance": imbalance,
+            "time": datetime.now(timezone.utc).isoformat()
+        }
+    )
+    print("Orderbook metrics:", event)
     producer.send("crypto.orderbook.metrics", event)
 
-    print("Orderbook metrics:", event)
+    

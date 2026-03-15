@@ -73,5 +73,7 @@ def save_whale(event):
 
 for message in consumer:
     event = message.value
-    save_whale(event)
+    data = event["data"]
     print("Saved whale:", event)
+    save_whale(data)
+    
