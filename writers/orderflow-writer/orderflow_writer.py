@@ -2,27 +2,10 @@ import json
 import psycopg2
 import time
 import config
-
 from datetime import datetime
-from kafka import KafkaConsumer
+from common.kafka import KafkaClient
 
-
-
-def connect_consumer():
-    while True:
-      try:
-        consumer = KafkaConsumer(
-            "crypto.orderflow.metrics",
-            bootstrap_servers=config.KAFKA_SERVER,
-            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-            auto_offset_reset="earliest",
-        )
-        print("Connected to Kafka")
-        return consumer
-      except Exception as e:
-        print("Kafka not ready...", e)
-        time.sleep(5)
-
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 def connect_db():
 
@@ -44,9 +27,6 @@ def connect_db():
 
             print("Waiting for PostgreSQL...")
             time.sleep(3)
-
-
-consumer = connect_consumer()
 
 conn = connect_db()
 cursor = conn.cursor()
@@ -78,8 +58,7 @@ def save_orderflow(event):
         conn.rollback()
 
 
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.orderflow.metrics", "orderflow-writer"):
     data = event["data"]
     print("Saved orderflow:", event)
     save_orderflow(data)

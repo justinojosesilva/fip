@@ -1,34 +1,9 @@
-import json
-import time
 import config
 from datetime import datetime
-from kafka import KafkaConsumer, KafkaProducer
 from common.event import create_event
+from common.kafka import KafkaClient
 
-
-# kafka
-def connect_kafka():
-    while True:
-        try:
-            consumer = KafkaConsumer(
-                "crypto.trades",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-            )
-            producer = KafkaProducer(
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_serializer=lambda x: json.dumps(x).encode("utf-8"),
-            )
-            print("Connected to Kafka")
-            return consumer, producer
-        except Exception as e:
-            print("Kafka not ready, retrying in 5s...")
-            time.sleep(5)
-
-
-consumer, producer = connect_kafka()
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 current_candle = None
 current_window = None
@@ -45,8 +20,7 @@ def start_new_candle(price, qty, symbol):
     }
 
 
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.trades", "orderflow-engine"):
     trade = event["data"]
 
     symbol = trade["symbol"]
@@ -80,7 +54,7 @@ for message in consumer:
           }
         )
         print("Candle: ", candle_event)
-        producer.send("crypto.candles", candle_event)
+        kafka.publish("crypto.candles", candle_event)
         
         current_window = window
         current_candle = start_new_candle(price, qty, symbol)

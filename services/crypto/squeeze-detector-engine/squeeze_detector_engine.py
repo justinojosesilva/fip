@@ -1,8 +1,10 @@
 import json
 import time
 import config
-from kafka import KafkaConsumer, KafkaProducer
+from common.kafka import KafkaClient
 from common.event import create_event
+
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 orderflow_data = {}
 orderbook_data = {}
@@ -71,11 +73,10 @@ def detect_squeeze(symbol):
       )
       
       print(f"Detected LONG SQUEEZE for {symbol} with confidence {sell_pressure:.2f}")
-      producer.send("crypto.squeeze.signals", signal)
+      kafka.publish("crypto.squeeze.signals", signal)
 
-for message in consumer:
-    topic = message.topic
-    event = message.value
+for event in kafka.consume(["crypto.orderflow", "crypto.orderbook.raw", "crypto.liquidation.metrics"], "squeeze-detector-engine"):
+    topic = event["topic"]
     data = event["data"]
     symbol = data["symbol"]
     

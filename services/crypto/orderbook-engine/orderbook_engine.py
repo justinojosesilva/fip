@@ -2,31 +2,10 @@ import json
 import time
 import config
 from datetime import datetime, timezone
-from kafka import KafkaConsumer, KafkaProducer
 from common.event import create_event
+from common.kafka import KafkaClient
 
-# kafka Consumer
-def connect_kafkaConsumer():
-    while True:
-        try:
-            consumer = KafkaConsumer(
-                "crypto.orderbook.raw",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-            )
-            producer = KafkaProducer(
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-            )
-            print("Connected to Kafka")
-            return consumer, producer
-        except Exception as e:
-            print("Kafka not ready, retrying in 5s...")
-            time.sleep(5)
-
-consumer, producer = connect_kafkaConsumer()
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 def process_orderbook(data):
     bids = data.get("bids",[])
@@ -61,8 +40,7 @@ def process_orderbook(data):
     
 
       
-for message in consumer:
-    event = message.value 
+for event in kafka.consume("crypto.orderbook.raw","orderbook-engine"):
     data = event["data"]
     symbol = data["symbol"]
     
@@ -86,6 +64,6 @@ for message in consumer:
         }
     )
     print("Orderbook metrics:", event)
-    producer.send("crypto.orderbook.metrics", event)
+    kafka.publish("crypto.orderbook.metrics", event)
 
     

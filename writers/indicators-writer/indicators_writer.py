@@ -1,33 +1,11 @@
 import json
 import psycopg2
 import time
-from datetime import datetime
-from kafka import KafkaConsumer
-
 import config
+from datetime import datetime
+from common.kafka import KafkaClient
 
-
-def connect_consumer():
-
-    while True:
-        try:
-
-            consumer = KafkaConsumer(
-                "crypto.indicators.metrics",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest",
-            )
-
-            print("Connected to Kafka")
-
-            return consumer
-
-        except:
-
-            print("Kafka not ready...")
-            time.sleep(5)
-
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 def connect_db():
 
@@ -49,9 +27,6 @@ def connect_db():
 
             print("Waiting for PostgreSQL...")
             time.sleep(3)
-
-
-consumer = connect_consumer()
 
 conn = connect_db()
 cursor = conn.cursor()
@@ -89,9 +64,7 @@ def save_indicator(event):
         conn.rollback()
 
 
-for message in consumer:
-
-    event = message.value
+for event in kafka.consume("crypto.indicators.metrics", "indicators-writer"):
     data = event["data"]
     print("Saved indicators:", event)
     save_indicator(data)

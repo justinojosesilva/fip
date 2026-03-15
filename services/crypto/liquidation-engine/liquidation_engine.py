@@ -1,33 +1,10 @@
-import json
 import time
 import config
-from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime
 from common.event import create_event
+from common.kafka import KafkaClient
 
-
-# kafka
-def connect_kafka():
-    while True:
-        try:
-            consumer = KafkaConsumer(
-                "crypto.liquidations",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-            )
-            producer = KafkaProducer(
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_serializer=lambda x: json.dumps(x).encode("utf-8"),
-            )
-            print("Connected to Kafka")
-            return consumer, producer
-        except Exception as e:
-            print("Kafka not ready, retrying in 5s...")
-            time.sleep(5)
-
-consumer, producer = connect_kafka()
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 windows = {}
 
@@ -69,7 +46,7 @@ def detect_cascade(event):
          "time": event["time"]
        }
        print("LONG CASCADE DETECTED: ", cascade)
-       producer.send("crypto.liquidation.cascades", cascade)
+       kafka.publish("crypto.liquidation.cascades", cascade)
     if short_liq > config.CASCADE_THRESHOLD:
        cascade = {
          "symbol": event["symbol"],
@@ -78,7 +55,7 @@ def detect_cascade(event):
          "time": event["time"]
        }
        print("SHORT CASCADE DETECTED: ", cascade)
-       producer.send("crypto.liquidation.cascades", cascade)
+       kafka.publish("crypto.liquidation.cascades", cascade)
         
 def flush_window():
     now_window = int(time.time() // config.WINDOW_SECONDS)
@@ -102,15 +79,14 @@ def flush_window():
           )
           
           print("Liquidation metric: ", event)
-          producer.send("crypto.liquidation.metrics", event)
+          kafka.publish("crypto.liquidation.metrics", event)
           detect_cascade(event)
           keys_to_delete.append(key)
           
     for key in keys_to_delete:
         del windows[key]
         
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.liquidations","liquidation-engine"):
     data = event["data"]
     process_liquidation(data)
     flush_window()

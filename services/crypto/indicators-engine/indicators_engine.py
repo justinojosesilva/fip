@@ -1,39 +1,14 @@
-import json
-import time
 import config
-from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
 from common.event import create_event
+from common.kafka import KafkaClient
+
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 buffers = {}
 BUFFER_SIZE = 50
 
 symbol_state = {}
-
-
-# kafka Consumer
-def connect_kafka():
-    while True:
-        try:
-            consumer = KafkaConsumer(
-                "crypto.trades",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-            )
-            producer = KafkaProducer(
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_serializer=lambda x: json.dumps(x).encode("utf-8"),
-            )
-            print("Connected to Kafka")
-            return consumer, producer
-        except Exception as e:
-            print("Kafka not ready, retrying in 5s...")
-            time.sleep(5)
-
-
-consumer, producer = connect_kafka()
 
 
 def calculate_ema(prices, period=config.EMA_PERIOD):
@@ -120,11 +95,10 @@ def process_trade(trade):
         }
     )
     print("Indicators: ", event)
-    producer.send("crypto.indicators.metrics", event)
+    kafka.publish("crypto.indicators.metrics", event)
     buffers[symbol] = []
 
 
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.trades", "indicators-engine"):
     trade = event["data"]
     process_trade(trade)

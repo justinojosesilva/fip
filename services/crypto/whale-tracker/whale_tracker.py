@@ -5,30 +5,11 @@ import config
 from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
 from common.event import create_event
+from common.kafka import KafkaClient
 
-# kafka
-def connect_kafka():
-  while True:
-    try:
-      consumer = KafkaConsumer(
-        'crypto.trades',
-        bootstrap_servers=config.KAFKA_SERVER,
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-        auto_offset_reset="latest",
-      )
-      producer = KafkaProducer(
-        bootstrap_servers=config.KAFKA_SERVER,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8")
-      )
-      print("Connected to Kafka")
-      return consumer, producer
-    except Exception as e:
-      print(f"Error connecting to Kafka: {e}")
-      time.sleep(5)
-    
-consumer, producer = connect_kafka()
+kafka = KafkaClient(config.KAFKA_SERVER)
 
-      
+
 def process_trade(trade):
     symbol = trade['symbol']
     price = float(trade['price'])
@@ -53,11 +34,10 @@ def process_trade(trade):
         }
       )
       print("WHALE DETECTED: ", whale_event)
-      producer.send("crypto.whales.detected", whale_event)
+      kafka.publish("crypto.whales.detected", whale_event)
       
       
 # loop principal
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.trades", "whale-tracker"):
     trade = event["data"]
     process_trade(trade)

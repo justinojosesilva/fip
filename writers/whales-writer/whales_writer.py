@@ -1,26 +1,11 @@
 import json
 import psycopg2
 import time
-from datetime import datetime
-from kafka import KafkaConsumer
-
 import config
+from datetime import datetime
+from common.kafka import KafkaClient
 
-
-def connect_consumer():
-    while True:
-        try:
-            consumer = KafkaConsumer(
-                "crypto.whales.detected",
-                bootstrap_servers=config.KAFKA_SERVER,
-                value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-                auto_offset_reset="earliest"
-            )
-            print("Connected to Kafka")
-            return consumer
-        except Exception:
-            print("Kafka not ready...")
-            time.sleep(5)
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 
 def connect_db():
@@ -37,9 +22,6 @@ def connect_db():
         except psycopg2.OperationalError:
             print("Waiting for PostgreSQL...")
             time.sleep(3)
-
-
-consumer = connect_consumer()
 
 conn = connect_db()
 cursor = conn.cursor()
@@ -71,8 +53,7 @@ def save_whale(event):
         conn.rollback()
 
 
-for message in consumer:
-    event = message.value
+for event in kafka.consume("crypto.whales.detected", "whales-writer"):
     data = event["data"]
     print("Saved whale:", event)
     save_whale(data)

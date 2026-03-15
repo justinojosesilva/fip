@@ -2,27 +2,11 @@ import json
 import websocket
 import time
 import config
-from kafka import KafkaProducer
 from datetime import datetime, timezone
 from common.event import create_event
+from common.kafka import KafkaClient
 
-
-# kafka producer
-def connect_kafkaProducer():
-  while True:
-    try:
-      producer = KafkaProducer(
-        bootstrap_servers=config.KAFKA_SERVER,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8")
-      )
-      print("Connected to Kafka")
-      return producer
-    except Exception as e:
-      print("Kafka not ready, retrying in 5s...")
-      time.sleep(5)
-
-producer = connect_kafkaProducer()     
-
+kafka = KafkaClient(config.KAFKA_SERVER)
 
 def on_message(ws, message):
   data = json.loads(message)
@@ -66,9 +50,11 @@ def on_message(ws, message):
   )
 
   # envia para kafka
-  producer.send("crypto.trades", event)
-  producer.send("crypto.prices", event_price)
-  print(event)
+  print("Trade event:", event)
+  kafka.publish("crypto.trades", event)
+  print("Price event:", event_price)
+  kafka.publish("crypto.prices", event_price)
+  
 
 def on_error(ws, error):
   print(error)
