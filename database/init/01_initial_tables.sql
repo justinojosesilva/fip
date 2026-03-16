@@ -167,7 +167,7 @@ SELECT add_retention_policy('betting_data.odds_history', INTERVAL '3 years');
 -- ANALYTICS
 -- =========================================
 
-CREATE TABLE analytics.crypto_indicators (
+CREATE TABLE analytics.crypto_micro_indicators (
     time TIMESTAMPTZ NOT NULL,
     symbol TEXT NOT NULL,
     price NUMERIC,
@@ -178,6 +178,43 @@ CREATE TABLE analytics.crypto_indicators (
     PRIMARY KEY (time, symbol)
 );
 
+SELECT create_hypertable('analytics.crypto_micro_indicators', 'time', if_not_exists => TRUE);
+
+ALTER TABLE analytics.crypto_micro_indicators
+SET (timescaledb.compress);
+
+SELECT add_compression_policy('analytics.crypto_micro_indicators', INTERVAL '30 days');
+
+SELECT add_retention_policy('analytics.crypto_micro_indicators', INTERVAL '5 years');
+
+-- =========================================
+CREATE TABLE IF NOT EXISTS analytics.crypto_indicators (
+    
+    time TIMESTAMPTZ NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    interval VARCHAR(10) NOT NULL,
+
+    price NUMERIC(18,8),
+
+    ema NUMERIC(18,8),
+    rsi NUMERIC(10,4),
+    vwap NUMERIC(18,8),
+
+    macd NUMERIC(18,8),
+    macd_signal NUMERIC(18,8),
+    macd_histogram NUMERIC(18,8),
+
+    bollinger_upper NUMERIC(18,8),
+    bollinger_middle NUMERIC(18,8),
+    bollinger_lower NUMERIC(18,8),
+
+    volume NUMERIC(20,8),
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    PRIMARY KEY (time, symbol, interval)
+);
+
 SELECT create_hypertable('analytics.crypto_indicators', 'time', if_not_exists => TRUE);
 
 ALTER TABLE analytics.crypto_indicators
@@ -186,7 +223,6 @@ SET (timescaledb.compress);
 SELECT add_compression_policy('analytics.crypto_indicators', INTERVAL '30 days');
 
 SELECT add_retention_policy('analytics.crypto_indicators', INTERVAL '5 years');
-
 -- =========================================
 
 CREATE TABLE analytics.arbitrage_opportunities (

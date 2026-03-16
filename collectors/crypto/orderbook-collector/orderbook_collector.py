@@ -1,14 +1,16 @@
 import json
-import websocket
 import config
 from common.event import create_event
-from common.kafka import KafkaClient
+from common.base_kafka import BaseKafka
+from common.websocket_client import WebSocketClient
 
-kafka = KafkaClient(config.KAFKA_SERVER)
+kafka = BaseKafka(config.KAFKA_SERVER)
 
-def on_message(ws, message):
-  
-  data = json.loads(message)
+def handle_message(ws, message):
+  try:
+    data = json.loads(message)
+  except Exception:
+    return
   
   symbol = data["s"]
   bids = data["b"]
@@ -28,24 +30,7 @@ def on_message(ws, message):
   )
   print(orderbook_data)
   kafka.publish("crypto.orderbook.raw", orderbook_data)
-   
   
-def on_error(ws, error):
-  print("WebSocket error: ", error)
-  
-def on_close(ws, close_status_code, close_msg):
-  print("WebSocket closed: ", close_status_code, close_msg)
-  
-def on_open(ws):
-  print("WebSocket connection opened")
-  
-if __name__ == "__main__":
-  ws = websocket.WebSocketApp(
-    config.WS_URL,
-    on_message=on_message,
-    on_error=on_error,
-    on_close=on_close
-  )
+ws = WebSocketClient(config.WS_URL, handle_message)
 
-  ws.on_open = on_open
-  ws.run_forever()
+ws.run()

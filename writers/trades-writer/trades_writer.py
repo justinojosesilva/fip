@@ -1,34 +1,18 @@
 import time
-import psycopg2
 import config
-from common.kafka import KafkaClient
+from common.base_kafka import BaseKafka
+from common.db import Database
 from datetime import datetime
 
-kafka = KafkaClient(config.KAFKA_SERVER)
-
+kafka = BaseKafka(config.KAFKA_SERVER)
+db = Database(config)
 
 BATCH_SIZE = 100
 FLUSH_INTERVAL = 2  # seconds
 buffer = []
 last_flush = time.time()
 
-# conexão banco
-def connect_db():
-  while True:
-    try:
-      conn = psycopg2.connect(
-        host=config.POSTGRES_HOST,
-        database=config.POSTGRES_DB,
-        user=config.POSTGRES_USER,
-        password=config.POSTGRES_PASSWORD
-      )
-      print("Connected to PostgreSQL")
-      return conn
-    except psycopg2.OperationalError:
-      print("Waiting for PostgreSQL...")
-      time.sleep(3)
-
-conn = connect_db()
+conn = db.connect()
 cursor = conn.cursor()
 
 def flush_buffer():

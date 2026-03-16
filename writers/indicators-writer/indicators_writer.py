@@ -1,70 +1,63 @@
-import json
-import psycopg2
-import time
 import config
 from datetime import datetime
-from common.kafka import KafkaClient
+from common.base_kafka import BaseKafka
+from common.db import Database
 
-kafka = KafkaClient(config.KAFKA_SERVER)
+kafka = BaseKafka(config.KAFKA_SERVER)
+db = Database(config)
 
-def connect_db():
-
-    while True:
-        try:
-
-            conn = psycopg2.connect(
-                host=config.POSTGRES_HOST,
-                database=config.POSTGRES_DB,
-                user=config.POSTGRES_USER,
-                password=config.POSTGRES_PASSWORD
-            )
-
-            print("Connected to PostgreSQL")
-
-            return conn
-
-        except psycopg2.OperationalError:
-
-            print("Waiting for PostgreSQL...")
-            time.sleep(3)
-
-conn = connect_db()
+conn = db.connect()
 cursor = conn.cursor()
 
-
 def save_indicator(event):
-
     try:
-
         time_value = datetime.fromisoformat(event["time"])
-
         cursor.execute(
             """
             INSERT INTO analytics.crypto_indicators
-            (time, symbol, price, ema, rsi, vwap, volume)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)
+            (
+                time,
+                symbol,
+                interval,
+                price,
+                ema,
+                rsi,
+                vwap,
+                macd,
+                macd_signal,
+                macd_histogram,
+                bollinger_upper,
+                bollinger_middle,
+                bollinger_lower,
+                volume
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT DO NOTHING
             """,
             (
                 time_value,
                 event["symbol"],
-                event["price"],
-                event["ema"],
-                event["rsi"],
-                event["vwap"],
-                event["volume"]
+                event["interval"],
+                event.get("price"),
+                event.get("ema"),
+                event.get("rsi"),
+                event.get("vwap"),
+                event.get("macd"),
+                event.get("macd_signal"),
+                event.get("macd_histogram"),
+                event.get("bollinger_upper"),
+                event.get("bollinger_middle"),
+                event.get("bollinger_lower"),
+                event.get("volume")
             )
         )
-
         conn.commit()
-
     except Exception as e:
-
         print("Database error:", e)
         conn.rollback()
 
 
-for event in kafka.consume("crypto.indicators.metrics", "indicators-writer"):
+for event in kafka.consume("crypto.indicators", "indicators-writer"):
     data = event["data"]
-    print("Saved indicators:", event)
+    print("Saving indicators:", data)
     save_indicator(data)

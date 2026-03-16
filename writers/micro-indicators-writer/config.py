@@ -6,9 +6,4 @@ POSTGRES_USER = os.getenv("POSTGRES_USER", "fip_postgres")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "fip_postgres")
 
 KAFKA_SERVER = os.getenv("KAFKA_SERVER", "kafka:9092")
-
-SYMBOLS = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "adausdt", "xrpusdt"]
-
 EXCHANGE = "binance"
-
-# WS_URL = f"wss://fstream.binance.com/ws/{SYMBOL}@forceOrder"

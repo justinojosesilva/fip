@@ -1,43 +1,52 @@
-import json
-import time
 import config
 
-from kafka import KafkaConsumer, KafkaProducer
 from datetime import datetime, timezone
-from common.event import create_event
-from common.kafka import KafkaClient
+from common.base_engine import BaseEngine
 
-kafka = KafkaClient(config.KAFKA_SERVER)
-
-
-def process_trade(trade):
-    symbol = trade['symbol']
-    price = float(trade['price'])
-    quantity = float(trade['quantity'])
-    side = trade['side']
+class WhaleTrackerEngine(BaseEngine):
+    input_topic = "crypto.trades"
+    output_topic = "crypto.whales.detected"
+    group_id = "whale-tracker"
+    source = "whale-tracker"
     
-    trade_value = price * quantity
-    
-    if trade_value >= config.WHALE_THRESHOLD:
-      print(f"WHALE DETECTED: {trade}")
-      
-      whale_event = create_event(
-        event_type="whale_detected",
-        source="whale_tracker",
-        data={
+    def process(self, event):
+        trade = event["data"]
+        
+        symbol = trade['symbol']
+        price = float(trade['price'])
+        quantity = float(trade['quantity'])
+        side = trade['side']
+        
+        trade_value = price * quantity
+        
+        if trade_value < config.WHALE_THRESHOLD:
+            return None
+            
+        if trade_value > 5 * config.WHALE_THRESHOLD:
+            size = "mega"
+        elif trade_value > 2 * config.WHALE_THRESHOLD:
+            size = "large"
+        else:
+            size = "normal"
+            
+        impact = trade_value / config.WHALE_THRESHOLD
+        
+        whale_event = {
           "symbol": symbol,
           "price": price,
           "quantity": quantity,
           "value": trade_value,
           "side": side,
+          "impact": impact,
+          "size": size,
           "time": datetime.now(timezone.utc).isoformat()
         }
-      )
-      print("WHALE DETECTED: ", whale_event)
-      kafka.publish("crypto.whales.detected", whale_event)
-      
-      
-# loop principal
-for event in kafka.consume("crypto.trades", "whale-tracker"):
-    trade = event["data"]
-    process_trade(trade)
+        print("WHALE DETECTED: ", whale_event)
+        return self.build_event(
+          "crypto.whales.detected",
+          whale_event
+        )
+        
+engine = WhaleTrackerEngine(config.KAFKA_SERVER)
+
+engine.run()

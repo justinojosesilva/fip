@@ -1,66 +1,41 @@
 import config
 from datetime import datetime
-from common.event import create_event
-from common.kafka import KafkaClient
+from common.base_window_engine import BaseWindowEngine
 
-kafka = KafkaClient(config.KAFKA_SERVER)
-
-current_candle = None
-current_window = None
-
-
-def start_new_candle(price, qty, symbol):
-    return {
-        "symbol": symbol,
-        "open": price,
-        "high": price,
-        "low": price,
-        "close": price,
-        "volume": qty,
-    }
-
-
-for event in kafka.consume("crypto.trades", "orderflow-engine"):
-    trade = event["data"]
-
-    symbol = trade["symbol"]
-    price = float(trade["price"])
-    qty = float(trade["quantity"])
-
-    trade_time = datetime.fromisoformat(trade["time"]).timestamp()
-
-    window = int(trade_time // config.CANDLE_INTERVAL)
-
-    if current_window is None:
+class CandlesEngine(BaseWindowEngine):
+      input_topic = "crypto.trades"
+      output_topic = "crypto.candles"
+      group_id = "candles-engine"
+      source = "candles-engine"
       
-        current_window = window
-        current_candle = start_new_candle(price, qty, symbol)
-
-    elif window != current_window:
-        candle_event = create_event(
-          event_type="candles",
-          source="candles-engine",
-          data={
-              "symbol": current_candle["symbol"],
-              "interval": "1m",
-              "open": current_candle["open"],
-              "high": current_candle["high"],
-              "low": current_candle["low"],
-              "close": current_candle["close"],
-              "volume": current_candle["volume"],
-              "time": datetime.utcfromtimestamp(
-                  current_window * config.CANDLE_INTERVAL
-              ).isoformat(),
+      window_seconds = 60
+      
+      def process_window(self, symbol, window, events):
+          if not events:
+            return None
+            
+          # garante ordem temporal
+          events.sort(key=lambda x: x["time"])
+            
+          prices = [float(e["price"]) for e in events]
+          volumes = [float(e["quantity"]) for e in events]
+          
+          candle = {
+            "symbol": symbol,
+            "interval": "1m",
+            "open": prices[0],
+            "high": max(prices),
+            "low": min(prices),
+            "close": prices[-1],
+            "volume": sum(volumes),
+            "time": datetime.utcfromtimestamp(window * self.window_seconds).isoformat()
           }
-        )
-        print("Candle: ", candle_event)
-        kafka.publish("crypto.candles", candle_event)
+          
+          return self.build_event(
+            "crypto.candles",
+            candle
+          )
+              
+engine = CandlesEngine(config.KAFKA_SERVER)
         
-        current_window = window
-        current_candle = start_new_candle(price, qty, symbol)
-
-    else:
-        current_candle["high"] = max(current_candle["high"], price)
-        current_candle["low"] = min(current_candle["low"], price)
-        current_candle["close"] = price
-        current_candle["volume"] += qty
+engine.run()

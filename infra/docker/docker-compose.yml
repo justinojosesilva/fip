@@ -213,6 +213,18 @@ services:
     environment:
       <<: *env_defaults
       
+  micro_indicators_writer:
+    <<: *writer_defaults
+    build: 
+      context: ../..
+      dockerfile: writers/micro-indicators-writer/Dockerfile
+    container_name: micro_indicators_writer
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
   orderflow_writer:
     <<: *writer_defaults
     build: 
@@ -243,6 +255,18 @@ services:
       context: ../..
       dockerfile: services/crypto/indicators-engine/Dockerfile
     container_name: indicators_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
+  micro_indicators_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/micro-indicators-engine/Dockerfile
+    container_name: micro_indicators_engine
     depends_on:
       - postgres
       - kafka

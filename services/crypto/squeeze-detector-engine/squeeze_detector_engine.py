@@ -1,4 +1,3 @@
-from this import s
 import config
 from common.kafka import KafkaClient
 from common.event import create_event
@@ -7,8 +6,8 @@ from common.stream_engine import StreamEngine
 kafka = KafkaClient(config.KAFKA_SERVER)
 
 topics = [
-  "crypto.orderflow",
-  "crypto.orderbook.raw",
+  "crypto.orderflow.metrics",
+  "crypto.orderbook.metrics",
   "crypto.liquidation.metrics"
 ]
 
@@ -20,10 +19,15 @@ engine = StreamEngine(
 )
 
 def detect(symbol, streams, window):
-  orderflow = streams["crypto.orderflow"]
-  orderbook = streams["crypto.orderbook.raw"]
+  orderflow = streams["crypto.orderflow.metrics"]
+  orderbook = streams["crypto.orderbook.metrics"]
   
-  buy_pressure = orderflow["buy_ratio"]
+  total_volume = orderflow["buy_volume"] + orderflow["sell_volume"]
+  
+  if total_volume == 0:
+      return
+  
+  buy_pressure = orderflow["buy_volume"] / total_volume
   
   imbalance = orderbook["imbalance"]
   
@@ -46,6 +50,7 @@ def detect(symbol, streams, window):
         "symbol": symbol,
         "type": "LONG_SQUEEZE",
         "confidence": buy_pressure,
+        "liquidations": short_liq_window
       }
     )
     

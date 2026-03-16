@@ -59,4 +59,9 @@ class KafkaClient:
     def consume(self, topic, group_id=None):
         consumer = self.create_consumer(topic, group_id)
         for message in consumer:
-            yield message.value
+            value = message.value
+            if isinstance(value, list):
+                for event in value:
+                  yield event
+            else:
+              yield value

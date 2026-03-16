@@ -7,4 +7,4 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "fip_postgres")
 
 KAFKA_SERVER = os.getenv("KAFKA_SERVER", "kafka:9092")
 
-BUFFER_SIZE = 50
+BUFFER_SIZE = 5 #50 é o normal

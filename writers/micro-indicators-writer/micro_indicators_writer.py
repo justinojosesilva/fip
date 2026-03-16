@@ -1,6 +1,3 @@
-import json
-import psycopg2
-import time
 import config
 from datetime import datetime
 from common.base_kafka import BaseKafka
@@ -13,33 +10,39 @@ conn = db.connect()
 cursor = conn.cursor()
 
 
-def save_orderflow(event):
+def save_indicator(event):
+
     try:
+
         time_value = datetime.fromisoformat(event["time"])
+
         cursor.execute(
             """
-            INSERT INTO analytics.crypto_orderflow
-            (time, symbol, buy_volume, sell_volume, delta, trade_count)
-            VALUES (%s,%s,%s,%s,%s,%s)
+            INSERT INTO analytics.crypto_indicators
+            (time, symbol, price, ema, rsi, vwap, volume)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT DO NOTHING
             """,
             (
                 time_value,
                 event["symbol"],
-                event["buy_volume"],
-                event["sell_volume"],
-                event["delta"],
-                event["trade_count"]
+                event["price"],
+                event["ema"],
+                event["rsi"],
+                event["vwap"],
+                event["volume"]
             )
         )
+
         conn.commit()
 
     except Exception as e:
+
         print("Database error:", e)
         conn.rollback()
 
 
-for event in kafka.consume("crypto.orderflow.metrics", "orderflow-writer"):
+for event in kafka.consume("crypto.micro.indicators", "micro-indicators-writer"):
     data = event["data"]
-    print("Saved orderflow:", event)
-    save_orderflow(data)
+    print("Saved indicators:", event)
+    save_indicator(data)

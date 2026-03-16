@@ -13,17 +13,26 @@ class StreamEngine:
         
     def run(self, handler):
         for message in self.consumer:
-            topic = message.topic
+            
             event = message.value
             
-            data = event["data"]
-            symbol = data["symbol"]
-            
-            self.join.update(topic, symbol, data)
-            
-            self.window.add(symbol, {topic: data})
-            
-            if self.join.ready(symbol, self.topics):
-                joined = self.join.get(symbol)
-                window = self.window.get(symbol)
-                handler(symbol, joined, window)
+            # se vier lita, iterar
+            if isinstance(event, list):
+              events = event
+            else: 
+              events = [event]
+              
+            for e in events: 
+                topic = message.topic
+                
+                data = e["data"]
+                symbol = data["symbol"]
+                
+                self.join.update(topic, symbol, data)
+                
+                self.window.add(symbol, {topic: data})
+                
+                if self.join.ready(symbol, self.topics):
+                    joined = self.join.get(symbol)
+                    window = self.window.get(symbol)
+                    handler(symbol, joined, window)

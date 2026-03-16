@@ -1,92 +1,91 @@
-import time
 import config
 from datetime import datetime
-from common.event import create_event
-from common.kafka import KafkaClient
+from common.base_window_engine import BaseWindowEngine
 
-kafka = KafkaClient(config.KAFKA_SERVER)
-
-windows = {}
-
-def process_liquidation(event):
-    symbol = event["symbol"]
-    side = event["side"]
-    quantity = float(event["quantity"])
-    price = float(event["price"])
-    
-    value = quantity * price
-    
-    event_time = datetime.fromisoformat(event["time"]).timestamp()
-    
-    window = int(event_time // config.WINDOW_SECONDS)
-    
-    key = f"{symbol}-{window}"
-    
-    if key not in windows:
-        windows[key] = {
-            "symbol": symbol,
-            "long_liquidations": 0,
-            "short_liquidations": 0
-        }
-    
-    if side == "SELL":
-        windows[key]["long_liquidations"] += value
-    else:
-        windows[key]["short_liquidations"] += value
-        
-def detect_cascade(event):
-    long_liq = event["long_liquidations"]
-    short_liq = event["short_liquidations"]
-    
-    if long_liq > config.CASCADE_THRESHOLD:
-       cascade = {
-         "symbol": event["symbol"],
-         "type": "LONG_CASCADE",
-         "volume": long_liq,
-         "time": event["time"]
-       }
-       print("LONG CASCADE DETECTED: ", cascade)
-       kafka.publish("crypto.liquidation.cascades", cascade)
-    if short_liq > config.CASCADE_THRESHOLD:
-       cascade = {
-         "symbol": event["symbol"],
-         "type": "SHORT_CASCADE",
-         "volume": short_liq,
-         "time": event["time"]
-       }
-       print("SHORT CASCADE DETECTED: ", cascade)
-       kafka.publish("crypto.liquidation.cascades", cascade)
-        
-def flush_window():
-    now_window = int(time.time() // config.WINDOW_SECONDS)
-    keys_to_delete = []
-    for key in windows:
-        symbol, window = key.split("-")
-        window = int(window)
-        if window < now_window:
-          data = windows[key]
-          event = create_event(
-            event_type="liquidation",
-            source="liquidation-engine",
-            data = {
+class LiquidationEngine(BaseWindowEngine):
+      input_topic = "crypto.liquidations"
+      output_topic = "crypto.liquidation.metrics"
+      group_id = "liquidation-engine"
+      source = "liquidation-engine"
+  
+      window_seconds = 60
+  
+      def process_window(self, symbol, window, events):
+  
+          long_liq = 0
+          short_liq = 0
+  
+          for e in events:
+  
+              value = float(e["price"]) * float(e["quantity"])
+  
+              if e["side"] == "SELL":
+                  long_liq += value
+              else:
+                  short_liq += value
+  
+          metric = {
               "symbol": symbol,
               "interval": "1m",
-              "long_liquidations": data["long_liquidations"],
-              "short_liquidations": data["short_liquidations"],
-              "liquidation_imbalance": data["long_liquidations"] - data["short_liquidations"],
-              "time": datetime.utcfromtimestamp(window * config.WINDOW_SECONDS).isoformat()
-            } 
+              "long_liquidations": long_liq,
+              "short_liquidations": short_liq,
+              "liquidation_imbalance": long_liq - short_liq,
+              "time": datetime.utcfromtimestamp(
+                  window * self.window_seconds
+              ).isoformat()
+          }
+  
+          metric_event = self.build_event(
+              "crypto.liquidation.metrics",
+              metric
           )
           
-          print("Liquidation metric: ", event)
-          kafka.publish("crypto.liquidation.metrics", event)
-          detect_cascade(event)
-          keys_to_delete.append(key)
+          # Detect cascade
+          cascades = self.detect_cascade(metric)
+          results = [metric_event]
           
-    for key in keys_to_delete:
-        del windows[key]
-        
-for event in kafka.consume("crypto.liquidations","liquidation-engine"):
-    data = event["data"]
-    process_liquidation(data)
-    flush_window()
+          if cascades:
+            results.extend(cascades)
+            
+          return results
+          
+      def detect_cascade(self, metric):
+          cascades = []
+          long_liq = metric["long_liquidations"]
+          short_liq = metric["short_liquidations"]
+          
+          if long_liq > config.CASCADE_THRESHOLD:
+            cascades = {
+              "symbol": metric["symbol"],
+              "type": "LONG_CASCADE",
+              "volume": long_liq,
+              "time": metric["time"]
+            }
+            
+            event = self.buld_event(
+              "crypto.liquidation.cascades",
+              cascades
+            )
+            
+            self.cascades.append(event)
+          
+          if short_liq > config.CASCADE_THRESHOLD:
+            cascades = {
+              "symbol": metric["symbol"],
+              "type": "SHORT_CASCADE",
+              "volume": short_liq,
+              "time": metric["time"]
+            }
+            
+            event = self.build_event(
+              "crypto.liquidation.cascades",
+              cascades
+            )
+            
+            self.cascades.append(event)
+            
+          return cascades
+
+engine = LiquidationEngine(config.KAFKA_SERVER)
+
+engine.run()
