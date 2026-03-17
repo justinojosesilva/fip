@@ -18,7 +18,7 @@ def save_indicator(event):
 
         cursor.execute(
             """
-            INSERT INTO analytics.crypto_indicators
+            INSERT INTO analytics.crypto_micro_indicators
             (time, symbol, price, ema, rsi, vwap, volume)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT DO NOTHING

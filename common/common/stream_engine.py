@@ -30,7 +30,7 @@ class StreamEngine:
                 
                 self.join.update(topic, symbol, data)
                 
-                self.window.add(symbol, {topic: data})
+                self.window.add(symbol, event)
                 
                 if self.join.ready(symbol, self.topics):
                     joined = self.join.get(symbol)

@@ -52,7 +52,8 @@ class IndicatorsEngine(BaseEngine):
             "rsi": rsi,
             "vwap": vwap,
             "volume": sum(volumes),
-            "time": candle["time"]
+            "time": candle["time"],
+            "interval": candle["interval"]
         }
 
         return self.build_event(

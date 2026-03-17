@@ -40,8 +40,14 @@ def detect(symbol, streams, window):
   short_liq_window = 0
   
   for event in window:
-      if event["event_type"] == "crypto.liquidation.metrics":
-          short_liq_window += event["data"]["short_liquidations"]
+    
+      if not isinstance(event, dict):
+          continue
+      event_type = event.get("event_type")
+      
+      if event_type == "crypto.liquidation.metrics":
+          data = event.get("data", {})
+          short_liq_window += data.get("short_liquidations", 0)
   
   if (
     short_liq_window > config.SHORT_SQUEEZE_THRESHOLD
@@ -50,7 +56,7 @@ def detect(symbol, streams, window):
   ):
     signal = create_event(
       event_type="crypto.squeeze.signal",
-      source="squeeze_detector_engine",
+      source="squeeze-detector-engine",
       data={
         "symbol": symbol,
         "type": "SHORT_SQUEEZE",

@@ -357,6 +357,18 @@ services:
     environment:
       <<: *env_defaults
       
+  signal_fusion_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/signal-fusion-engine/Dockerfile
+    container_name: signal_fusion_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
 volumes:
   postgres_data:
      
