@@ -19,6 +19,12 @@ engine = StreamEngine(
 )
 
 def detect(symbol, streams, window):
+  if "crypto.orderflow.metrics" not in streams:
+      return
+
+  if "crypto.orderbook.metrics" not in streams:
+      return
+  
   orderflow = streams["crypto.orderflow.metrics"]
   orderbook = streams["crypto.orderbook.metrics"]
   
@@ -34,9 +40,8 @@ def detect(symbol, streams, window):
   short_liq_window = 0
   
   for event in window:
-    
-    if "crypto.liquidation.metrics" in event:
-      short_liq_window += event["crypto.liquidation.metrics"]["short_liquidations"]
+      if event["event_type"] == "crypto.liquidation.metrics":
+          short_liq_window += event["data"]["short_liquidations"]
   
   if (
     short_liq_window > config.SHORT_SQUEEZE_THRESHOLD
@@ -44,17 +49,17 @@ def detect(symbol, streams, window):
     and imbalance > config.ORDERBOOK_IMBALANCE_THRESHOLD
   ):
     signal = create_event(
-      event_type="squeeze_signal",
+      event_type="crypto.squeeze.signal",
       source="squeeze_detector_engine",
       data={
         "symbol": symbol,
-        "type": "LONG_SQUEEZE",
+        "type": "SHORT_SQUEEZE",
         "confidence": buy_pressure,
         "liquidations": short_liq_window
       }
     )
     
-    print(f"Detected LONG SQUEEZE: {signal}")
+    print(f"Detected SHORT SQUEEZE: {signal}")
     kafka.publish("crypto.squeeze.signals", signal)
     
 engine.run(detect)

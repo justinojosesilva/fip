@@ -345,6 +345,18 @@ services:
     environment:
       <<: *env_defaults
       
+  micro_structure_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/micro-structure-engine/Dockerfile
+    container_name: micro_structure_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
 volumes:
   postgres_data:
      

@@ -1,11 +1,9 @@
-from datetime import datetime, timezone
-
 import config
+from datetime import datetime, timezone
+from common.stateful_engine import StatefulBaseEngine
 
-from common.base_engine import BaseEngine
 
-
-class OrderFlowEngine(BaseEngine):
+class OrderFlowEngine(StatefulBaseEngine):
     input_topic = "crypto.trades"
     output_topic = "crypto.orderflow.metrics"
     group_id = "orderflow-engine"
@@ -16,7 +14,6 @@ class OrderFlowEngine(BaseEngine):
     def __init__(self, kafka_server):
         super().__init__(kafka_server)
         self.buffers = {}
-        self.cvd_state = {}
 
     def process(self, event):
         trade = event["data"]
@@ -59,12 +56,15 @@ class OrderFlowEngine(BaseEngine):
 
         delta = buy_volume - sell_volume
 
-        # 🔹 CVD acumulado
-        if symbol not in self.cvd_state:
-            self.cvd_state[symbol] = 0
-
-        self.cvd_state[symbol] += delta
-        cvd = self.cvd_state[symbol]
+        # recupera CVD salvo
+        cvd = self.get_state(f"cvd:{symbol}")
+        if not cvd:
+            cvd = 0
+            
+        cvd += delta
+        
+        # salvar CVD
+        self.set_state(f"cvd:{symbol}", cvd)
 
         trade_count = len(trades)
 
