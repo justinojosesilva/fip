@@ -369,6 +369,18 @@ services:
     environment:
       <<: *env_defaults
       
+  stop_hunt_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/stop-hunt-engine/Dockerfile
+    container_name: stop_hunt_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
 volumes:
   postgres_data:
      
