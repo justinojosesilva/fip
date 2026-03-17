@@ -381,6 +381,18 @@ services:
     environment:
       <<: *env_defaults
       
+  opportunity_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/opportunity-engine/Dockerfile
+    container_name: opportunity_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
 volumes:
   postgres_data:
      
