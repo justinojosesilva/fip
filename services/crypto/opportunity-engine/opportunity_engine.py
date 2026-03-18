@@ -1,3 +1,5 @@
+from multiprocessing.reduction import register
+import re
 import config
 from common.kafka import KafkaClient
 from common.event import create_event
@@ -10,7 +12,8 @@ topics = [
   "crypto.squeeze.signals",
   "crypto.stop_hunt.signals",
   "crypto.orderflow.metrics",
-  "crypto.liquidation.metrics"
+  "crypto.liquidation.metrics",
+  "crypto.market.regime"
 ]
 
 engine = StreamEngine(
@@ -23,6 +26,8 @@ engine = StreamEngine(
 def compute_score(symbol, window):
   score = 0
   
+  regime, confidence = get_market_regime(symbol, window)
+  
   for event in window:
     if not isinstance(event, dict):
       continue
@@ -34,16 +39,28 @@ def compute_score(symbol, window):
       continue
       
     if event_type == "crypto.stop_hunt.signals":
-      score += config.SCORE_STOP_HUNT
+      if regime == "RANGE":
+        score += config.SCORE_STOP_HUNT * 1.5
+      else:
+        score += config.SCORE_STOP_HUNT
       
     if event_type == "crypto.microstructure.signals":
       signal_type = data.get("type", "")
       if signal_type == "ABSORPTION":
-        score += config.SCORE_ABSORPTION
+        if regime == "RANGE":
+          score += config.SCORE_ABSORPTION * 1.5
+        else: 
+          score += config.SCORE_ABSORPTION
       if "SWEEP" in signal_type:
-        score += config.SCORE_SWEEP
+        if regime == "TREND":
+          score += config.SCORE_SWEEP * 1.5
+        else:
+          score += config.SCORE_SWEEP
       if signal_type == "LIQUIDITY_VACUUM":
-        score += config.SCORE_LIQUIDITY_VACUUM
+        if regime == "TREND":
+          score += config.SCORE_LIQUIDITY_VACUUM * 1.5
+        else:
+          score += config.SCORE_LIQUIDITY_VACUUM
         
     if event_type == "crypto.squeeze.signals":
       score += config.SCORE_SQUEEZE
@@ -68,6 +85,12 @@ def compute_score(symbol, window):
   return score
 
 def detect(symbol, streams, window):
+  
+  regime, confidence = get_market_regime(symbol, window)
+  
+  if regime == "LOW_LIQUIDITY":
+    return
+  
   signals = []
   signals += detect_reversal(symbol, streams, window)
   signals += detect_breakout(symbol, streams, window)
@@ -84,8 +107,13 @@ def detect(symbol, streams, window):
     kafka.publish("crypto.opportunity.signals", event)
     
   score = compute_score(symbol, window)
+  
+  threshold = config.OPPORTUNITY_SCORE_THRESHOLD
    
-  if score < config.OPPORTUNITY_SCORE_THRESHOLD:
+  if regime == "VOLATILE":
+    threshold *= 2  # Lower threshold in volatile markets
+   
+  if score < threshold:
      return
      
   direction = infer_direction(symbol, window)
@@ -95,6 +123,8 @@ def detect(symbol, streams, window):
     "type": "HIGH_PROBABILITY_SETUP",
     "score": score,
     "direction": direction,
+    "regime": regime,
+    "regime_confidence": confidence
   }
   
   event = create_event(
@@ -242,5 +272,26 @@ def detect_squeeze_setup(symbol, streams, window):
       }
     })
   return signals
+  
+def get_market_regime(symbol, window):
+  regime = None
+  confidence = 0
+  
+  for event in window:
+    if not isinstance(event, dict):
+      continue
+      
+    if event.get("event_type") != "crypto.market.regime":
+      continue
+    
+    data = event.get("data", {})
+      
+    if data.get("symbol") != symbol:
+      continue
+      
+    regime = data.get("regime")
+    confidence = data.get("confidence", 0)
+    
+  return regime, confidence
   
 engine.run(detect)

@@ -393,6 +393,18 @@ services:
     environment:
       <<: *env_defaults
       
+  market_regime_engine:
+    <<: *engine_defaults
+    build: 
+      context: ../..
+      dockerfile: services/crypto/market-regime-engine/Dockerfile
+    container_name: market_regime_engine
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      <<: *env_defaults
+      
 volumes:
   postgres_data:
      
