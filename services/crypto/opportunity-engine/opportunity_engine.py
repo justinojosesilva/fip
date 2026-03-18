@@ -1,5 +1,3 @@
-from multiprocessing.reduction import register
-import re
 import config
 from common.kafka import KafkaClient
 from common.event import create_event
@@ -13,7 +11,8 @@ topics = [
   "crypto.stop_hunt.signals",
   "crypto.orderflow.metrics",
   "crypto.liquidation.metrics",
-  "crypto.market.regime"
+  "crypto.market.regime",
+  "crypto.liquidity.map"
 ]
 
 engine = StreamEngine(
@@ -23,66 +22,7 @@ engine = StreamEngine(
   window_seconds=20
 )
 
-def compute_score(symbol, window):
-  score = 0
-  
-  regime, confidence = get_market_regime(symbol, window)
-  
-  for event in window:
-    if not isinstance(event, dict):
-      continue
-      
-    event_type = event.get("event_type")
-    data = event.get("data", {})
-    
-    if data.get("symbol") != symbol:
-      continue
-      
-    if event_type == "crypto.stop_hunt.signals":
-      if regime == "RANGE":
-        score += config.SCORE_STOP_HUNT * 1.5
-      else:
-        score += config.SCORE_STOP_HUNT
-      
-    if event_type == "crypto.microstructure.signals":
-      signal_type = data.get("type", "")
-      if signal_type == "ABSORPTION":
-        if regime == "RANGE":
-          score += config.SCORE_ABSORPTION * 1.5
-        else: 
-          score += config.SCORE_ABSORPTION
-      if "SWEEP" in signal_type:
-        if regime == "TREND":
-          score += config.SCORE_SWEEP * 1.5
-        else:
-          score += config.SCORE_SWEEP
-      if signal_type == "LIQUIDITY_VACUUM":
-        if regime == "TREND":
-          score += config.SCORE_LIQUIDITY_VACUUM * 1.5
-        else:
-          score += config.SCORE_LIQUIDITY_VACUUM
-        
-    if event_type == "crypto.squeeze.signals":
-      score += config.SCORE_SQUEEZE
-      
-    if event_type == "crypto.orderflow.metrics":
-      buy_ratio = data.get("buy_ratio", 0)
-      
-      if buy_ratio > 0.7:
-        score += config.SCORE_ORDERFLOW_IMBALANCE
-      if buy_ratio < 0.3:
-        score += config.SCORE_ORDERFLOW_IMBALANCE
-        
-    if event_type == "crypto.liquidation.metrics":
-      long_liq = data.get("long_liquidations", 0)
-      short_liq = data.get("short_liquidations", 0)
-      if long_liq > config.LIQ_SPIKE:
-        score += config.SCORE_LIQUIDATION_SPIKE
-        
-      if short_liq > config.LIQ_SPIKE:
-        score += config.SCORE_LIQUIDATION_SPIKE
-        
-  return score
+
 
 def detect(symbol, streams, window):
   
@@ -106,12 +46,12 @@ def detect(symbol, streams, window):
     print("Opportunity detected:", event)
     kafka.publish("crypto.opportunity.signals", event)
     
-  score = compute_score(symbol, window)
+  score = compute_score(symbol, window, regime)
   
   threshold = config.OPPORTUNITY_SCORE_THRESHOLD
    
   if regime == "VOLATILE":
-    threshold *= 2  # Lower threshold in volatile markets
+    threshold *= 2  # Increase threshold in volatile markets
    
   if score < threshold:
      return
@@ -136,6 +76,100 @@ def detect(symbol, streams, window):
   print("High probability opportunity detected:", event)
   kafka.publish("crypto.opportunity.signals", event)
   
+def compute_score(symbol, window, regime):
+  score = 0
+  seen = set()
+
+  liquidity_zones = get_liquidity_zones(symbol, window)
+  
+  for event in window:
+    if not isinstance(event, dict):
+      continue
+      
+    event_type = event.get("event_type")
+    data = event.get("data", {})
+    
+    if data.get("symbol") != symbol:
+      continue
+      
+    if event_type == "crypto.stop_hunt.signals" and "stop_hunt" not in seen:
+      if regime == "RANGE":
+        score += config.SCORE_STOP_HUNT * 1.5
+      else:
+        score += config.SCORE_STOP_HUNT
+      seen.add("stop_hunt")
+      
+    if event_type == "crypto.microstructure.signals":
+      signal_type = data.get("type", "")
+      
+      if signal_type == "ABSORPTION" and "absorption" not in seen:
+        if regime == "RANGE":
+          score += config.SCORE_ABSORPTION * 1.5
+        else: 
+          score += config.SCORE_ABSORPTION
+        seen.add("absorption")
+        
+      if "SWEEP" in signal_type and "sweep" not in seen:
+        
+        if regime == "TREND":
+          score += config.SCORE_SWEEP * 1.5
+        else:
+          score += config.SCORE_SWEEP
+        seen.add("sweep")
+        
+      if signal_type == "LIQUIDITY_VACUUM" and "vacuum" not in seen:
+        
+        if regime == "TREND":
+          score += config.SCORE_LIQUIDITY_VACUUM * 1.5
+        else:
+          score += config.SCORE_LIQUIDITY_VACUUM
+        seen.add("vacuum")
+        
+    if event_type == "crypto.squeeze.signals" and "squeeze" not in seen:
+      score += config.SCORE_SQUEEZE
+      seen.add("squeeze")
+      
+    if event_type == "crypto.orderflow.metrics" and "orderflow" not in seen:
+      buy_ratio = data.get("buy_ratio", 0)
+      
+      if buy_ratio > 0.7:
+        score += config.SCORE_ORDERFLOW_IMBALANCE
+      if buy_ratio < 0.3:
+        score += config.SCORE_ORDERFLOW_IMBALANCE
+      seen.add("orderflow")
+        
+    if event_type == "crypto.liquidation.metrics" and "liquidation" not in seen:
+      long_liq = data.get("long_liquidations", 0)
+      short_liq = data.get("short_liquidations", 0)
+      if long_liq > config.LIQ_SPIKE:
+        score += config.SCORE_LIQUIDATION_SPIKE
+        
+      if short_liq > config.LIQ_SPIKE:
+        score += config.SCORE_LIQUIDATION_SPIKE
+        
+      seen.add("liquidation")
+        
+  for zone in liquidity_zones:
+    zone_type = zone.get("type")
+    
+    if zone_type == "LIQUIDATION_POOL":
+      score += config.SCORE_LIQUIDITY_POOL
+      
+    if zone_type == "STOP_CLUSTER":
+      score += config.SCORE_STOP_CLUSTER
+      
+    if zone_type == "THIN_LIQUIDITY":
+      if regime == "TREND":
+        score += config.SCORE_THIN_LIQUIDITY * 1.5
+      else:
+        score += config.SCORE_THIN_LIQUIDITY
+        
+    if zone_type == "HIGH_LIQUIDITY_ZONE":
+      if regime == "RANGE":
+        score += config.SCORE_HIGH_LIQUIDITY
+
+  return score
+  
 def infer_direction(symbol, window):
   
   buy_pressure = 0
@@ -158,6 +192,15 @@ def infer_direction(symbol, window):
         
       if ratio < 0.4:
         sell_pressure += 1
+        
+    if event.get("event_type") == "crypto.squeeze.signals":
+      data = event.get("data", {})
+      
+      if data.get("symbol") != symbol:
+        continue
+        
+      if  data.get("type") == "SHORT_SQUEEZE_SETUP":
+        buy_pressure += 2
   
   if buy_pressure > sell_pressure:
     return "LONG"
@@ -218,7 +261,7 @@ def detect_breakout(symbol, streams, window):
       continue
       
     if event_type == "crypto.microstructure.signals":
-      if "SWEEP" in data.get("type"):
+      if "SWEEP" in data.get("type", ""):
         sweep = True
         
       if data.get("type") == "LIQUIDITY_VACUUM":
@@ -293,5 +336,24 @@ def get_market_regime(symbol, window):
     confidence = data.get("confidence", 0)
     
   return regime, confidence
+  
+def get_liquidity_zones(symbol, window):
+  zones = []
+  
+  for event in window:
+    if not isinstance(event, dict):
+      continue
+      
+    if event.get("event_type") != "crypto.liquidity.map":
+      continue
+    
+    data = event.get("data", {})
+      
+    if data.get("symbol") != symbol:
+      continue
+      
+    zones.append(data)
+    
+  return zones
   
 engine.run(detect)
